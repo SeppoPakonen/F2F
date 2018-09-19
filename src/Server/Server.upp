@@ -1,0 +1,16 @@
+uses
+	Core,
+	plugin/sqlite3;
+
+library(WIN32) "ssleay32MT libeay32MT";
+
+file
+	Server.h,
+	Server.cpp,
+	db.sch,
+	AES.h,
+	AES.cpp;
+
+mainconfig
+	"" = "";
+
