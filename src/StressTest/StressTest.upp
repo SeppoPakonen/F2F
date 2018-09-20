@@ -1,0 +1,14 @@
+uses
+	Core;
+
+library(WIN32) "ssleay32MT libeay32MT";
+
+file
+	StressTest.h,
+	StressTest.cpp,
+	AES.h,
+	AES.cpp;
+
+mainconfig
+	"" = "";
+
