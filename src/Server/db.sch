@@ -1,7 +1,7 @@
 TABLE_(USERS)
    INT_     (ID) PRIMARY_KEY
-   STRING   (NICK, 200)
-   INT_     (PASSHASH)
+   STRING_  (NICK, 200)
+   INT64_   (PASSHASH)
    TIME_    (JOINED)
    TIME_    (LASTLOGIN)
    INT_     (LOGINS)

@@ -14,11 +14,13 @@ struct InboxMessage : Moveable<InboxMessage> {
 
 struct ActiveSession {
 	int user_id = 0;
+	String name;
 	Vector<InboxMessage> inbox;
 	SpinLock lock;
 };
 
 class Server {
+	One<Sql> sql;
 	ArrayMap<String, ActiveSession> sessions;
 	VectorMap<int, String> user_session_ids;
 	TcpSocket listener;
@@ -40,6 +42,9 @@ public:
 	void Leave(Stream& in, Stream& out);
 	void Location(Stream& in, Stream& out);
 	void Message(Stream& in, Stream& out);
+	void Poll(Stream& in, Stream& out);
+	void Get(Stream& in, Stream& out);
+	void Set(Stream& in, Stream& out);
 	
 };
 
