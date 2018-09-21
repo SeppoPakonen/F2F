@@ -1,12 +1,23 @@
 #include "StressTest.h"
 #include "AES.h"
 
+void Print(const String& s) {
+	static Mutex lock;
+	lock.Enter();
+	Cout() << s;
+	Cout().PutEol();
+	lock.Leave();
+}
+
+
+
+
 Client::Client() {
 	
 }
 	
 void Client::Run() {
-	Cout() << "Client " << id << " Running\n";
+	Print("Client " + IntStr(id) + " Running");
 	
 	int count = 0;
 	
@@ -15,12 +26,12 @@ void Client::Run() {
 		s.Create();
 		
 		if(!s->Connect("127.0.0.1", 17000)) {
-			Cout() << "Client " << id << " Unable to connect to server!\n";
+			Print("Client " + IntStr(id) + " Unable to connect to server!");
 			return;
 		}
 		
 		try {
-			while (!Thread::IsShutdownThreads()) {
+			while (!Thread::IsShutdownThreads() && s->IsOpen()) {
 				
 				int action;
 				if (count == 0) {
@@ -59,21 +70,21 @@ void Client::Run() {
 			}
 		}
 		catch (Exc e) {
-			Cout() << "Client " << id << " Error: " << e << "\n";
+			Print("Client " + IntStr(id) + " Error: " + e);
 			count = min(count, 1);
 		}
 		catch (const char* e) {
-			Cout() << "Client " << id << " Error: " << e << "\n";
+			Print("Client " + IntStr(id) + " Error: " + e);
 			count = min(count, 1);
 		}
 		catch (...) {
-			Cout() << "Client " << id << " Unexpected error\n";
+			Print("Client " + IntStr(id) + " Unexpected error");
 			break;
 		}
 	}
 	
 	
-	Cout() << "Client " << id << " Stopping\n";
+	Print("Client " + IntStr(id) + " Stopping");
 }
 
 void Client::Call(Stream& out, Stream& in) {
@@ -119,7 +130,7 @@ void Client::Register() {
 	pass = in.Get(8);
 	if (pass.GetCount() != 8) throw Exc("Invalid  password");
 	
-	Cout() << "Client " << id << " registered (pass " << pass << ")\n";
+	Print("Client " + IntStr(id) + " registered (pass " + pass + ")");
 }
 
 void Client::Login() {
@@ -131,17 +142,16 @@ void Client::Login() {
 	
 	Call(out, in);
 	
-	sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
+	int ret = in.Get32();
+	if (ret != 0) throw Exc("Login failed");
 	
-	Cout() << "Client " << id << " logged in (session password " << sesspass << ")\n";
+	Print("Client " + IntStr(id) + " logged in (" + IntStr(user_id) + ", " + pass + ")");
 }
 
 bool Client::Set(const String& key, const String& value) {
 	StringStream out, in;
 	
 	out.Put32(300);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
@@ -152,12 +162,12 @@ bool Client::Set(const String& key, const String& value) {
 	
 	int ret = in.Get32();
 	if (ret == 1) {
-		Cout() << "Client " << id << " set " << key << " = " << value << " FAILED\n";
+		Print("Client " + IntStr(id) + " set " + key + " = " + value + " FAILED");
 		return 1;
 	}
 	else if (ret != 0) throw Exc("Setting value failed");
 	
-	Cout() << "Client " << id << " set " << key << " = " << value << "\n";
+	Print("Client " + IntStr(id) + " set " + key + " = " + value);
 	return 0;
 }
 
@@ -165,7 +175,6 @@ void Client::Get(const String& key, String& value) {
 	StringStream out, in;
 	
 	out.Put32(400);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
@@ -179,7 +188,7 @@ void Client::Get(const String& key, String& value) {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Getting value failed");
 	
-	Cout() << "Client " << id << " get " << key << "\n";
+	Print("Client " + IntStr(id) + " get " + key);
 }
 
 void Client::Join(String channel) {
@@ -187,7 +196,6 @@ void Client::Join(String channel) {
 	StringStream out, in;
 	
 	out.Put32(500);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
@@ -200,7 +208,7 @@ void Client::Join(String channel) {
 	
 	joined_channels.Add(channel);
 	
-	Cout() << "Client " << id << " joined channel " << channel << "\n";
+	Print("Client " + IntStr(id) + " joined channel " + channel);
 }
 
 void Client::Leave(String channel) {
@@ -208,7 +216,6 @@ void Client::Leave(String channel) {
 	StringStream out, in;
 	
 	out.Put32(600);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
@@ -221,7 +228,7 @@ void Client::Leave(String channel) {
 	
 	joined_channels.RemoveKey(channel);
 	
-	Cout() << "Client " << id << " left from channel " << channel << "\n";
+	Print("Client " + IntStr(id) + " left from channel " + channel);
 }
 
 void Client::Message(int recv_user_id, const String& msg) {
@@ -229,7 +236,6 @@ void Client::Message(int recv_user_id, const String& msg) {
 	StringStream out, in;
 	
 	out.Put32(700);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	out.Put32(recv_user_id);
 	out.Put32(msg.GetCount());
@@ -240,14 +246,13 @@ void Client::Message(int recv_user_id, const String& msg) {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Message sending failed");
 	
-	Cout() << "Client " << id << " sent message from " << user_id << " to " << recv_user_id << ": " << msg << "\n";
+	Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + IntStr(recv_user_id) + ": " + msg);
 }
 
 void Client::Poll() {
 	StringStream out, in;
 	
 	out.Put32(800);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	Call(out, in);
 	
@@ -258,7 +263,7 @@ void Client::Poll() {
 		int msg_len = in.Get32();
 		String message = in.Get(msg_len);
 		if (message.GetCount() != msg_len) throw Exc("Polling failed");
-		Cout() << "Client " << id << " received from " << sender_id << ": " << message << "\n";
+		Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + message);
 	}
 }
 
@@ -266,7 +271,6 @@ void Client::SendLocation(const Location& l) {
 	StringStream out, in;
 	
 	out.Put32(900);
-	out.Put(sesspass.Begin(), sesspass.GetCount());
 	
 	out.Put(&l.latitude, sizeof(l.latitude));
 	out.Put(&l.longitude, sizeof(l.longitude));
@@ -277,7 +281,7 @@ void Client::SendLocation(const Location& l) {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Updating location failed");
 	
-	Cout() << "Client " << id << " updated location\n";
+	Print("Client " + IntStr(id) + " updated location");
 }
 
 void Client::RefreshUserlist() {
@@ -300,7 +304,7 @@ void Client::RefreshUserlist() {
 	}
 	if (fail) throw Exc("Getting userlist failed");
 	
-	Cout() << "Client " << id << " updated userlist (size " << user_count << ")\n";
+	Print("Client " + IntStr(id) + " updated userlist (size " + IntStr(user_count) + ")");
 }
 
 String Client::RandomNewChannel() {

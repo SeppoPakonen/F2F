@@ -23,7 +23,7 @@ struct User : Moveable<User> {
 class Client {
 	VectorMap<String, User> users;
 	Index<String> joined_channels;
-	String pass, sesspass;
+	String pass;
 	One<TcpSocket> s;
 	int id = -1;
 	int user_id = -1;
