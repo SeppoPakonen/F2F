@@ -20,6 +20,14 @@ String RandomPassword(int length) {
 	return s;
 }
 
+void Print(const String& s) {
+	static SpinLock lock;
+	lock.Enter();
+	Cout() << s;
+	Cout().PutEol();
+	lock.Leave();
+}
+
 
 Server::Server() {
 	
@@ -34,7 +42,6 @@ void Server::Init() {
 	SQL = sqlite3;
 	
 	// Update the schema to match the schema described in "db.sch"
-	#ifdef _DEBUG
 	SqlSchema sch(SQLITE3);
 	All_Tables(sch);
 	if(sch.ScriptChanged(SqlSchema::UPGRADE))
@@ -47,43 +54,74 @@ void Server::Init() {
 		SqlPerformScript(sch.Config());
 	}
 	sch.SaveNormal();
-	#endif
-	
-	sql.Create();
 }
 
 void Server::Listen() {
 	
 	if(!listener.Listen(17000, 5)) {
-		Cout() << "Unable to initialize server socket!\n";
+		Print("Unable to initialize server socket!");
 		SetExitCode(1);
 		return;
 	}
-	Cout() << "Waiting for requests..\n";
+	Print("Waiting for requests..");
+	TimeStop ts;
 	while (!Thread::IsShutdownThreads()) {
-		One<TcpSocket> s;
-		s.Create();
-		if(s->Accept(listener)) {
-			Thread::Start(THISBACK1(HandleSocket, s.Detach()));
+		One<ActiveSession> ses;
+		ses.Create();
+		ses->server = this;
+		if(ses->s.Accept(listener)) {
+				
+			// Close blacklisted connections
+			if (blacklist.Find(ses->s.GetPeerAddr()) != -1)
+				ses->s.Close();
+			else {
+				int id = session_counter++;
+				ses->sess_id = id;
+				
+				lock.EnterWrite();
+				sessions.Add(id, ses.Detach()).Start();
+				lock.LeaveWrite();
+			}
+		}
+		
+		if (ts.Elapsed() > 60*1000) {
+			lock.EnterWrite();
+			for(int i = 0; i < sessions.GetCount(); i++) {
+				if (!sessions[i].s.IsOpen()) {
+					sessions.Remove(i);
+					i--;
+				}
+			}
+			lock.LeaveWrite();
+			ts.Reset();
 		}
 	}
 }
 
-void Server::HandleSocket(One<TcpSocket> s) {
-	Cout() << "Started handling socket from " << s->GetPeerAddr() << "\n";
+
+
+
+
+
+
+
+
+
+ActiveSession::ActiveSession() {
+	
+}
+
+void ActiveSession::Run() {
+	Print("Session " + IntStr(sess_id) + " started handling socket from " + s.GetPeerAddr());
 	try {
 		
-		// Close blacklisted connections
-		if (blacklist.Find(s->GetPeerAddr()) != -1)
-			throw Exc("Address is blacklisted");
-		
-		while (s->IsOpen()) {
+		while (s.IsOpen()) {
 			int r;
 			int in_size;
-			r = s->Get(&in_size, sizeof(in_size));
+			r = s.Get(&in_size, sizeof(in_size));
 			if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) throw Exc("Received invalid size");
 			
-			String in_data = s->Get(in_size);
+			String in_data = s.Get(in_size);
 			if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
 			
 			AESDecoderStream dec("passw0rdpassw0rd");
@@ -120,31 +158,30 @@ void Server::HandleSocket(One<TcpSocket> s) {
 			String out_data = enc.GetEncryptedData();
 			int out_size = out_data.GetCount();
 			
-			r = s->Put(&out_size, sizeof(out_size));
+			r = s.Put(&out_size, sizeof(out_size));
 			if (r != sizeof(out_size)) throw Exc("Data sending failed");
-			r = s->Put(out_data.Begin(), out_data.GetCount());
+			r = s.Put(out_data.Begin(), out_data.GetCount());
 			if (r != out_data.GetCount()) throw Exc("Data sending failed");
-			
-			Cout() << "Sent " << out_str.GetCount() << " (" << out_size << ")\n";
 		}
 	}
 	catch (Exc e) {
-		Cout() << "Error processing client from: " << s->GetPeerAddr() << " Reason: " << e << '\n';
+		Print("Error processing client from: " + s.GetPeerAddr() + " Reason: " + e);
 	}
 	catch (const char* e) {
-		Cout() << "Error processing client from: " << s->GetPeerAddr() << " Reason: " << e << '\n';
+		Print("Error processing client from: " + s.GetPeerAddr() + " Reason: " + e);
 	}
 	catch (...) {
-		Cout() << "Error processing client from: " << s->GetPeerAddr() << '\n';
+		Print("Error processing client from: " + s.GetPeerAddr());
 	}
 	
-	s->Close();
+	s.Close();
+	
+	Logout();
 }
 
-void Server::Register(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
+void ActiveSession::Register(Stream& in, Stream& out) {
 	
-	lock.Enter();
+	server->lock.EnterWrite();
 	
 	int id = 0;
 	sql*Select(Count(ID)).From(USERS);
@@ -174,132 +211,107 @@ void Server::Register(Stream& in, Stream& out) {
 		(LL_ELEVATION, 0)
 		(LL_UPDATED, 0);
 	
-	lock.Leave();
+	server->lock.LeaveWrite();
 	
 	out.Put(&id, sizeof(id));
 	out.Put(pass.Begin(), 8);
 	
-	Cout() << "Registered " << id << " " << pass << " (hash " << passhash << ")\n";
+	Print("Registered " + IntStr(id) + " " + pass + " (hash " + IntStr64(passhash) + ")");
 }
 
-void Server::Login(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
-	int id;
-	
-	int r = in.Get(&id, sizeof(id));
-	if (r != sizeof(id)) throw Exc("Invalid login id");
+void ActiveSession::Login(Stream& in, Stream& out) {
+	int r = in.Get(&user_id, sizeof(user_id));
+	if (r != sizeof(user_id)) throw Exc("Invalid login id");
 	
 	String pass = in.Get(8);
 	if (pass.GetCount() != 8) throw Exc("Invalid login password");
 	int64 passhash = pass.GetHashValue();
 	
-	lock.Enter();
-	
-	sql*Select(PASSHASH).From(USERS).Where(ID == id);
+	sql*Select(PASSHASH).From(USERS).Where(ID == user_id);
 	bool found = sql.Fetch();
-	if (sql.WasError() || !found) {lock.Leave(); throw Exc("Invalid login password");}
+	if (sql.WasError() || !found) throw Exc("Invalid login password");
 	int64 correct_passhash = sql[0];
-	if (passhash != correct_passhash) {lock.Leave(); throw Exc("Invalid login password");}
+	if (passhash != correct_passhash) throw Exc("Invalid login password");
 	
-	String sesspass = RandomPassword(8);
-	
-	sql*Select(LOGINS).From(USERS).Where(ID == id);
+	sql*Select(LOGINS).From(USERS).Where(ID == user_id);
 	sql.Fetch();
 	int logins = sql[0];
 	
-	ActiveSession& as = sessions.Add(sesspass);
-	as.user_id = id;
-	user_session_ids.GetAdd(id) = sesspass;
+	server->lock.EnterWrite();
+	server->user_session_ids.GetAdd(user_id, sess_id) = sess_id;
+	server->lock.LeaveWrite();
 	
-	sql*Select(NICK).From(USERS).Where(ID == id);
+	sql*Select(NICK).From(USERS).Where(ID == user_id);
 	sql.Fetch();
-	as.name = sql[0];
+	name = sql[0];
 	
-	sql*Update(USERS)(LASTLOGIN, GetUtcTime())(LOGINS, logins + 1).Where(ID == id);
+	sql*Update(USERS)(LASTLOGIN, GetUtcTime())(LOGINS, logins + 1).Where(ID == user_id);
 	
-	lock.Leave();
-	
-	out.Put(sesspass.Begin(), 8);
+	out.Put32(0);
 }
 
-void Server::Set(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
+void ActiveSession::Logout() {
+	server->lock.EnterWrite();
+	server->user_session_ids.RemoveKey(user_id);
+	server->lock.LeaveWrite();
+}
+
+void ActiveSession::Set(Stream& in, Stream& out) {
 	int r;
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
-	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
 	int key_len;
 	String key;
 	r = in.Get(&key_len, sizeof(key_len));
-	if (r != sizeof(key_len) || key_len < 0 || key_len > 200) {lock.Leave(); throw Exc("Invalid key argument");}
+	if (r != sizeof(key_len) || key_len < 0 || key_len > 200) throw Exc("Invalid key argument");
 	key = in.Get(key_len);
-	if (key.GetCount() != key_len) {lock.Leave(); throw Exc("Invalid key received");}
+	if (key.GetCount() != key_len) throw Exc("Invalid key received");
 	
 	int value_len;
 	String value;
 	r = in.Get(&value_len, sizeof(value_len));
-	if (r != sizeof(value_len) || value_len < 0 || value_len > 10000) {lock.Leave(); throw Exc("Invalid value argument");}
+	if (r != sizeof(value_len) || value_len < 0 || value_len > 10000) throw Exc("Invalid value argument");
 	value = in.Get(value_len);
-	if (value.GetCount() != value_len) {lock.Leave(); throw Exc("Invalid value received");}
+	if (value.GetCount() != value_len) throw Exc("Invalid value received");
 	
 	int ret = 0;
 	if (key == "name") {
 		sql*Select(Count(ID)).From(USERS).Where(NICK == value);
 		int exists = sql[0];
 		if (!exists) {
-			sql*Update(USERS)(NICK, value).Where(ID == as.user_id);
-			as.name = value;
+			sql*Update(USERS)(NICK, value).Where(ID == user_id);
+			name = value;
 		} else {
 			ret = 1;
 		}
 		//TODO send name change to all
 	}
 	
-	lock.Leave();
-	
 	out.Put32(ret);
 }
 
-void Server::Get(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
+void ActiveSession::Get(Stream& in, Stream& out) {
 	int r;
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
-	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
 	int key_len;
 	String key;
 	r = in.Get(&key_len, sizeof(key_len));
-	if (r != sizeof(key_len) || key_len < 0 || key_len > 200) {lock.Leave(); throw Exc("Invalid key argument");}
+	if (r != sizeof(key_len) || key_len < 0 || key_len > 200) throw Exc("Invalid key argument");
 	key = in.Get(key_len);
-	if (key.GetCount() != key_len) {lock.Leave(); throw Exc("Invalid key received");}
+	if (key.GetCount() != key_len) throw Exc("Invalid key received");
 	
 	int64 size_pos = out.GetPos();
 	out.SeekCur(sizeof(int));
 	
 	if (key == "userlist") {
-		out.Put32(sessions.GetCount());
-		for(int i = 0; i < sessions.GetCount(); i++) {
-			const ActiveSession& as = sessions[i];
+		server->lock.EnterRead();
+		out.Put32(server->sessions.GetCount());
+		for(int i = 0; i < server->sessions.GetCount(); i++) {
+			const ActiveSession& as = server->sessions[i];
 			out.Put32(as.user_id);
 			out.Put32(as.name.GetCount());
 			if (!as.name.IsEmpty())
 				out.Put(as.name.Begin(), as.name.GetCount());
 		}
+		server->lock.LeaveRead();
 	}
-	
-	lock.Leave();
 	
 	out.Seek(size_pos);
 	out.Put32(out.GetSize() - size_pos - 4);
@@ -307,146 +319,90 @@ void Server::Get(Stream& in, Stream& out) {
 	out.Put32(0);
 }
 
-void Server::Join(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
-	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
+void ActiveSession::Join(Stream& in, Stream& out) {
 	int ch_len;
 	in.Get(&ch_len, sizeof(ch_len));
-	if (ch_len < 0 || ch_len > 200) {lock.Leave(); throw Exc("Invalid channel name");}
+	if (ch_len < 0 || ch_len > 200) throw Exc("Invalid channel name");
 	String ch_name = in.Get(ch_len);
-	if (ch_name.GetCount() != ch_len) {lock.Leave(); throw Exc("Invalid channel name");}
+	if (ch_name.GetCount() != ch_len) throw Exc("Invalid channel name");
 	
-	sql*Insert(CHANNELS)(CH_USER_ID, as.user_id)(CHANNEL, ch_name)(CH_JOINED, GetUtcTime());
-	
-	lock.Leave();
+	sql*Insert(CHANNELS)(CH_USER_ID, user_id)(CHANNEL, ch_name)(CH_JOINED, GetUtcTime());
 	
 	out.Put32(0);
 }
 
-void Server::Leave(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
-	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
+void ActiveSession::Leave(Stream& in, Stream& out) {
 	int ch_len;
 	in.Get(&ch_len, sizeof(ch_len));
-	if (ch_len < 0 || ch_len > 200) {lock.Leave(); throw Exc("Invalid channel name");}
+	if (ch_len < 0 || ch_len > 200) throw Exc("Invalid channel name");
 	String ch_name = in.Get(ch_len);
-	if (ch_name.GetCount() != ch_len) {lock.Leave(); throw Exc("Invalid channel name");}
+	if (ch_name.GetCount() != ch_len) throw Exc("Invalid channel name");
 	
-	sql*Delete(CHANNELS).Where(CH_USER_ID == as.user_id && CHANNEL == ch_name);
-	
-	lock.Leave();
+	sql*Delete(CHANNELS).Where(CH_USER_ID == user_id && CHANNEL == ch_name);
 	
 	out.Put32(0);
 }
 
-void Server::Location(Stream& in, Stream& out) {
-	Sql& sql = *this->sql;
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
-	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
+void ActiveSession::Location(Stream& in, Stream& out) {
 	int r;
 	double lat, lon, elev;
 	r = in.Get(&lat, sizeof(lat));
-	if (r != sizeof(double)) {lock.Leave(); throw Exc("Invalid location argument");}
+	if (r != sizeof(double)) throw Exc("Invalid location argument");
 	r = in.Get(&lon, sizeof(lon));
-	if (r != sizeof(double)) {lock.Leave(); throw Exc("Invalid location argument");}
+	if (r != sizeof(double)) throw Exc("Invalid location argument");
 	r = in.Get(&elev, sizeof(elev));
-	if (r != sizeof(double)) {lock.Leave(); throw Exc("Invalid location argument");}
+	if (r != sizeof(double)) throw Exc("Invalid location argument");
 	
-	sql*Update(LAST_LOCATION)(LL_LON, lon)(LL_LAT, lat)(LL_ELEVATION, elev)(LL_UPDATED, GetUtcTime()).Where(LL_USER_ID == as.user_id);
+	sql*Update(LAST_LOCATION)(LL_LON, lon)(LL_LAT, lat)(LL_ELEVATION, elev)(LL_UPDATED, GetUtcTime()).Where(LL_USER_ID == user_id);
 	
-	sql*Insert(LOCATION_HISTORY)(LH_USER_ID, as.user_id)(LH_LON, lon)(LH_LAT, lat)(LH_ELEVATION, elev)(LH_UPDATED, GetUtcTime());
+	sql*Insert(LOCATION_HISTORY)(LH_USER_ID, user_id)(LH_LON, lon)(LH_LAT, lat)(LH_ELEVATION, elev)(LH_UPDATED, GetUtcTime());
 	
 	out.Put32(0);
-	
-	lock.Leave();
 }
 
-void Server::Message(Stream& in, Stream& out) {
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
-	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
-	int r;
+void ActiveSession::Message(Stream& in, Stream& out) {
+	int r, i;
 	int recv_user_id, recv_msg_len;
 	String recv_msg;
 	r = in.Get(&recv_user_id, sizeof(recv_user_id));
-	if (r != sizeof(recv_user_id)) {lock.Leave(); throw Exc("Invalid message argument");}
+	if (r != sizeof(recv_user_id)) throw Exc("Invalid message argument");
 	r = in.Get(&recv_msg_len, sizeof(recv_msg_len));
-	if (r != sizeof(recv_msg_len) || recv_msg_len < 0 || recv_msg_len > 10000) {lock.Leave(); throw Exc("Invalid message argument");}
+	if (r != sizeof(recv_msg_len) || recv_msg_len < 0 || recv_msg_len > 10000) throw Exc("Invalid message argument");
 	recv_msg = in.Get(recv_msg_len);
-	if (recv_msg.GetCount() != recv_msg_len) {lock.Leave(); throw Exc("Invalid message received");}
+	if (recv_msg.GetCount() != recv_msg_len) throw Exc("Invalid message received");
 	
-	i = user_session_ids.Find(recv_user_id);
-	if (i < 0)  {lock.Leave(); throw Exc("Invalid receiver id");}
-	String recv_sesspass = user_session_ids[i];
-	i = sessions.Find(recv_sesspass);
-	if (i < 0)  {lock.Leave(); throw Exc("System error");}
-	ActiveSession& recv_as = sessions[i];
+	server->lock.EnterRead();
+	i = server->user_session_ids.Find(recv_user_id);
+	if (i < 0)  {server->lock.LeaveRead(); throw Exc("Invalid receiver id");}
+	int recv_sess_id = server->user_session_ids[i];
+	i = server->sessions.Find(recv_sess_id);
+	if (i < 0)  {server->lock.LeaveRead(); throw Exc("System error");}
+	ActiveSession& recv_as = server->sessions[i];
+	server->lock.LeaveRead();
 	
-	lock.Leave();
-	
-	recv_as.lock.Enter();
+	lock.Enter();
 	InboxMessage& msg = recv_as.inbox.Add();
 	msg.message = recv_msg;
-	msg.sender_id = as.user_id;
-	recv_as.lock.Leave();
+	msg.sender_id = user_id;
+	lock.Leave();
 	
 	out.Put32(0);
 }
 
-void Server::Poll(Stream& in, Stream& out) {
-	String sesspass = in.Get(8);
-	if (sesspass.GetCount() != 8) throw Exc("Invalid session password");
-	
+void ActiveSession::Poll(Stream& in, Stream& out) {
 	lock.Enter();
-	
-	int i = sessions.Find(sesspass);
-	if (i < 0) {lock.Leave(); throw Exc("Invalid session password");}
-	ActiveSession& as = sessions[i];
-	
-	lock.Leave();
-	
-	as.lock.Enter();
-	int count = as.inbox.GetCount();
+	int count = inbox.GetCount();
 	out.Put32(count);
 	for(int i = 0; i < count; i++) {
-		InboxMessage& im = as.inbox[i];
+		InboxMessage& im = inbox[i];
 		out.Put32(im.sender_id);
 		
 		int msg_len = im.message.GetCount();
 		out.Put32(msg_len);
 		out.Put(im.message.Begin(), msg_len);
 	}
-	as.inbox.SetCount(0);
-	as.lock.Leave();
+	inbox.SetCount(0);
+	lock.Leave();
 }
 
 
@@ -458,6 +414,6 @@ CONSOLE_APP_MAIN {
 		s.Listen();
 	}
 	catch (Exc e) {
-		Cout() << "Error. Reason: " << e << '\n';
+		Print("Error. Reason: " + e);
 	}
 }

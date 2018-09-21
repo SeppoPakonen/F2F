@@ -5,6 +5,9 @@
 #include <plugin/sqlite3/Sqlite3.h>
 using namespace Upp;
 
+class Server;
+
+void Print(const String& s);
 String RandomPassword(int length);
 
 struct InboxMessage : Moveable<InboxMessage> {
@@ -12,21 +15,55 @@ struct InboxMessage : Moveable<InboxMessage> {
 	String message;
 };
 
-struct ActiveSession {
-	int user_id = 0;
-	String name;
-	Vector<InboxMessage> inbox;
+class ActiveSession {
+	
+protected:
+	friend class Server;
+	
+	Server* server = NULL;
 	SpinLock lock;
+	Sql sql;
+	TcpSocket s;
+	
+	int sess_id = -1;
+	int user_id = -1;
+	String name;
+	
+	Vector<InboxMessage> inbox;
+	
+	
+public:
+	typedef ActiveSession CLASSNAME;
+	ActiveSession();
+	void Run();
+	void Start() {Thread::Start(THISBACK(Run));}
+	
+	
+	void Register(Stream& in, Stream& out);
+	void Login(Stream& in, Stream& out);
+	void Logout();
+	void Join(Stream& in, Stream& out);
+	void Leave(Stream& in, Stream& out);
+	void Location(Stream& in, Stream& out);
+	void Message(Stream& in, Stream& out);
+	void Poll(Stream& in, Stream& out);
+	void Get(Stream& in, Stream& out);
+	void Set(Stream& in, Stream& out);
+	
 };
 
 class Server {
-	One<Sql> sql;
-	ArrayMap<String, ActiveSession> sessions;
-	VectorMap<int, String> user_session_ids;
+	
+protected:
+	friend class ActiveSession;
+	
+	ArrayMap<int, ActiveSession> sessions;
+	VectorMap<int, int> user_session_ids;
 	TcpSocket listener;
 	Index<String> blacklist;
 	Sqlite3Session sqlite3;
-	Mutex lock;
+	RWMutex lock;
+	int session_counter = 0;
 	
 public:
 	typedef Server CLASSNAME;
@@ -35,16 +72,6 @@ public:
 	void Init();
 	void Listen();
 	void HandleSocket(One<TcpSocket> s);
-	
-	void Register(Stream& in, Stream& out);
-	void Login(Stream& in, Stream& out);
-	void Join(Stream& in, Stream& out);
-	void Leave(Stream& in, Stream& out);
-	void Location(Stream& in, Stream& out);
-	void Message(Stream& in, Stream& out);
-	void Poll(Stream& in, Stream& out);
-	void Get(Stream& in, Stream& out);
-	void Set(Stream& in, Stream& out);
 	
 };
 
