@@ -70,7 +70,8 @@ void Server::Listen() {
 		ses.Create();
 		ses->server = this;
 		if(ses->s.Accept(listener)) {
-				
+			ses->s.Timeout(5000);
+			
 			// Close blacklisted connections
 			if (blacklist.Find(ses->s.GetPeerAddr()) != -1)
 				ses->s.Close();
@@ -98,7 +99,77 @@ void Server::Listen() {
 	}
 }
 
+void Server::JoinChannel(const String& channel, ActiveSession& user) {
+	lock.EnterWrite();
+	int i = channel_ids.Find(channel);
+	int id;
+	if (i == -1) {
+		id = channel_counter++;
+		channel_ids.Add(channel, id);
+		Channel& ch = channels.Add(id);
+		ch.name = channel;
+	} else {
+		id = channel_ids[i];
+	}
+	Channel& ch = channels.Get(id);
+	SendMessage(user.user_id, "join " + user.name + " " + IntStr(user.user_id) + " " + channel, ch.users);
+	ch.users.Add(user.user_id);
+	user.channels.Add(id);
+	lock.LeaveWrite();
+}
 
+void Server::LeaveChannel(const String& channel, ActiveSession& user) {
+	lock.EnterWrite();
+	int id = channel_ids.Get(channel);
+	Channel& ch = channels.Get(id);
+	ch.users.RemoveKey(user.user_id);
+	user.channels.RemoveKey(id);
+	SendMessage(user.user_id, "leave " + user.name + " " + IntStr(user.user_id) + " " + channel, ch.users);
+	lock.LeaveWrite();
+}
+
+void Server::SendMessage(int sender_id, const String& msg, const Index<int>& user_list) {
+	if (msg.IsEmpty()) return;
+	const MessageRef& ref = IncReference(msg, user_list.GetCount());
+	for(int i = 0; i < user_list.GetCount(); i++) {
+		ActiveSession& as = sessions.Get(user_session_ids.Get(user_list[i]));
+		as.lock.Enter();
+		InboxMessage& m = as.inbox.Add();
+		m.sender_id = sender_id;
+		m.msg = ref.hash;
+		as.lock.Leave();
+	}
+}
+
+const MessageRef& Server::IncReference(const String& msg, int ref_count) {
+	unsigned hash = msg.GetHashValue();
+	msglock.EnterWrite();
+	MessageRef& ref = messages.GetAdd(hash);
+	if (ref.msg.IsEmpty()) {
+		ref.msg = msg;
+		ref.hash = hash;
+	}
+	ref.refcount += ref_count;
+	msglock.LeaveWrite();
+	return ref;
+}
+
+MessageRef& Server::GetReference(unsigned hash) {
+	msglock.EnterRead();
+	MessageRef& ref = messages.Get(hash);
+	msglock.LeaveRead();
+	return ref;
+}
+
+void Server::DecReference(MessageRef& ref) {
+	ref.refcount--;
+	if (ref.refcount == 0) {
+		msglock.EnterWrite();
+		if (ref.refcount == 0) // check again after acquiring the lock
+			messages.RemoveKey(ref.hash);
+		msglock.LeaveWrite();
+	}
+}
 
 
 
@@ -109,6 +180,14 @@ void Server::Listen() {
 
 ActiveSession::ActiveSession() {
 	
+}
+
+void ActiveSession::GetUserlist(Index<int>& userlist) {
+	for(int i = 0; i < channels.GetCount(); i++) {
+		const Channel& ch = server->channels.Get(channels[i]);
+		for(int j = 0; j < ch.users.GetCount(); j++)
+			userlist.FindAdd(ch.users[j]);
+	}
 }
 
 void ActiveSession::Run() {
@@ -211,6 +290,10 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 		(LL_ELEVATION, 0)
 		(LL_UPDATED, 0);
 	
+	sql*Insert(CHANNELS)(CH_USER_ID, id)(CHANNEL, "oulu")(CH_JOINED, GetUtcTime());
+	sql*Insert(CHANNELS)(CH_USER_ID, id)(CHANNEL, "news")(CH_JOINED, GetUtcTime());
+	sql*Insert(CHANNELS)(CH_USER_ID, id)(CHANNEL, "testers")(CH_JOINED, GetUtcTime());
+	
 	server->lock.LeaveWrite();
 	
 	out.Put(&id, sizeof(id));
@@ -247,6 +330,12 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 	
 	sql*Update(USERS)(LASTLOGIN, GetUtcTime())(LOGINS, logins + 1).Where(ID == user_id);
 	
+	sql*Select(CHANNEL).From(CHANNELS).Where(CH_USER_ID == user_id);
+	while (sql.Fetch()) {
+		String channel = sql[0];
+		server->JoinChannel(channel, *this);
+	}
+	
 	out.Put32(0);
 }
 
@@ -254,6 +343,16 @@ void ActiveSession::Logout() {
 	server->lock.EnterWrite();
 	server->user_session_ids.RemoveKey(user_id);
 	server->lock.LeaveWrite();
+	
+	while (!channels.IsEmpty())
+		server->LeaveChannel(server->channels.Get(channels[0]).name, *this);
+	
+	// Dereference messages
+	for(int i = 0; i < inbox.GetCount(); i++) {
+		InboxMessage& msg = inbox[i];
+		MessageRef& ref = server->GetReference(msg.msg);
+		server->DecReference(ref);
+	}
 }
 
 void ActiveSession::Set(Stream& in, Stream& out) {
@@ -282,7 +381,10 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		} else {
 			ret = 1;
 		}
-		//TODO send name change to all
+		
+		Index<int> userlist;
+		GetUserlist(userlist);
+		server->SendMessage(user_id, "name " + IntStr(user_id) + " " + value, userlist);
 	}
 	
 	out.Put32(ret);
@@ -302,14 +404,19 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	
 	if (key == "userlist") {
 		server->lock.EnterRead();
-		out.Put32(server->sessions.GetCount());
-		for(int i = 0; i < server->sessions.GetCount(); i++) {
-			const ActiveSession& as = server->sessions[i];
+		
+		Index<int> userlist;
+		GetUserlist(userlist);
+		out.Put32(userlist.GetCount());
+		for(int i = 0; i < userlist.GetCount(); i++) {
+			int j = server->user_session_ids.Get(userlist[i]);
+			const ActiveSession& as = server->sessions[j];
 			out.Put32(as.user_id);
 			out.Put32(as.name.GetCount());
 			if (!as.name.IsEmpty())
 				out.Put(as.name.Begin(), as.name.GetCount());
 		}
+		
 		server->lock.LeaveRead();
 	}
 	
@@ -326,9 +433,16 @@ void ActiveSession::Join(Stream& in, Stream& out) {
 	String ch_name = in.Get(ch_len);
 	if (ch_name.GetCount() != ch_len) throw Exc("Invalid channel name");
 	
-	sql*Insert(CHANNELS)(CH_USER_ID, user_id)(CHANNEL, ch_name)(CH_JOINED, GetUtcTime());
-	
-	out.Put32(0);
+	// Check if user is already joined at the channel
+	sql*Select(CH_USER_ID).From(CHANNELS).Where(CH_USER_ID == user_id && CHANNEL == ch_name);
+	if (sql.Fetch()) {
+		out.Put32(1);
+	} else {
+		sql*Insert(CHANNELS)(CH_USER_ID, user_id)(CHANNEL, ch_name)(CH_JOINED, GetUtcTime());
+		server->JoinChannel(ch_name, *this);
+		
+		out.Put32(0);
+	}
 }
 
 void ActiveSession::Leave(Stream& in, Stream& out) {
@@ -339,6 +453,7 @@ void ActiveSession::Leave(Stream& in, Stream& out) {
 	if (ch_name.GetCount() != ch_len) throw Exc("Invalid channel name");
 	
 	sql*Delete(CHANNELS).Where(CH_USER_ID == user_id && CHANNEL == ch_name);
+	server->LeaveChannel(ch_name, *this);
 	
 	out.Put32(0);
 }
@@ -380,9 +495,11 @@ void ActiveSession::Message(Stream& in, Stream& out) {
 	ActiveSession& recv_as = server->sessions[i];
 	server->lock.LeaveRead();
 	
+	const MessageRef& ref = server->IncReference("msg " + recv_msg, 1);
+	
 	lock.Enter();
 	InboxMessage& msg = recv_as.inbox.Add();
-	msg.message = recv_msg;
+	msg.msg = ref.hash;
 	msg.sender_id = user_id;
 	lock.Leave();
 	
@@ -394,16 +511,20 @@ void ActiveSession::Poll(Stream& in, Stream& out) {
 	int count = inbox.GetCount();
 	out.Put32(count);
 	for(int i = 0; i < count; i++) {
-		InboxMessage& im = inbox[i];
+		const InboxMessage& im = inbox[i];
 		out.Put32(im.sender_id);
 		
-		int msg_len = im.message.GetCount();
+		MessageRef& ref = server->GetReference(im.msg);
+		int msg_len = ref.msg.GetCount();
 		out.Put32(msg_len);
-		out.Put(im.message.Begin(), msg_len);
+		out.Put(ref.msg.Begin(), msg_len);
+		
+		server->DecReference(ref);
 	}
 	inbox.SetCount(0);
 	lock.Leave();
 }
+
 
 
 
