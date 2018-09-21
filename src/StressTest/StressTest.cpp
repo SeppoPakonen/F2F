@@ -105,7 +105,7 @@ void Client::Call(Stream& out, Stream& in) {
 	r = s->Put(out_data.Begin(), out_data.GetCount());
 	if (r != out_data.GetCount()) throw Exc("Data sending failed");
 	
-	s->Timeout(5000);
+	s->Timeout(30000);
 	int in_size;
 	r = s->Get(&in_size, sizeof(in_size));
 	if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) throw Exc("Received invalid size");
@@ -298,6 +298,8 @@ void Client::Poll() {
 			User& u = users.GetAdd(user_id);
 			u.name = user_name;
 			u.channels.RemoveKey(channel);
+			if (u.channels.IsEmpty())
+				users.RemoveKey(user_id);
 		}
 		else if (key == "name") {
 			Vector<String> args = Split(message, " ");
@@ -427,7 +429,7 @@ CONSOLE_APP_MAIN
 {
 	Array<Client> clients;
 	
-	for(int i = 0; i < 10; i++) {
+	for(int i = 0; i < 100; i++) {
 		Client& c = clients.Add();
 		c.SetId(i);
 		c.Start();
