@@ -2,13 +2,87 @@
 #define _Server_Server_h_
 
 #include <Core/Core.h>
-#include <plugin/sqlite3/Sqlite3.h>
 using namespace Upp;
 
 class Server;
 
 void Print(const String& s);
 String RandomPassword(int length);
+
+enum {
+	NICK,
+	PASSHASH,
+	JOINED,
+	LASTLOGIN,
+	LOGINS,
+	ONLINETOTAL,
+	VISIBLETOTAL,
+	LL_LON, LL_LAT, LL_ELEVATION,
+	LL_UPDATED,
+	CHANNEL_BEGIN
+	
+};
+
+
+class UserDatabase {
+	int user_id = -1;
+	FileAppend user, location;
+	Vector<int> offsets;
+	int record_size = 0;
+	bool open = false;
+	
+	static const int channel_record = 200+sizeof(Time);
+	
+public:
+	UserDatabase();
+	void Init(int user_id);
+	void Deinit();
+	void Value(int size) {offsets.Add(record_size); record_size += size;}
+	bool IsOpen() const {return open;}
+	
+	void SetTime(int key, Time value);
+	void SetStr(int key, String value);
+	void SetInt(int key, int64 value);
+	void SetDbl(int key, double value);
+	
+	void Flush();
+	
+	int64 GetInt(int key);
+	String GetString(int key);
+	Time GetTime(int key);
+	double GetDbl(int key);
+	
+	int AddChannel(const String& channel);
+	int GetChannelCount();
+	String GetChannel(int i);
+	int FindChannel(const String& channel);
+	void DeleteChannel(int i);
+	
+	void SetLocation(double longitude, double latitude, double elevation);
+};
+
+enum {
+	SERVER_NICK
+};
+
+class ServerDatabase {
+	FileAppend file;
+	
+	static const int user_record = 200;
+	
+public:
+	ServerDatabase();
+	
+	void Init();
+	int GetUserCount();
+	void AddUser(String user);
+	int FindUser(const String& user);
+	void SetUser(int user_id, String name);
+	String GetUser(int i);
+	
+	void Flush();
+	
+};
 
 struct InboxMessage : Moveable<InboxMessage> {
 	int sender_id;
@@ -28,7 +102,6 @@ protected:
 	
 	Server* server = NULL;
 	SpinLock lock;
-	Sql sql;
 	TcpSocket s;
 	
 	int sess_id = -1;
@@ -37,6 +110,8 @@ protected:
 	
 	Vector<InboxMessage> inbox;
 	Index<int> channels;
+	
+	UserDatabase db;
 	
 public:
 	typedef ActiveSession CLASSNAME;
@@ -77,7 +152,7 @@ protected:
 	VectorMap<unsigned, MessageRef> messages;
 	TcpSocket listener;
 	Index<String> blacklist;
-	Sqlite3Session sqlite3;
+	ServerDatabase db;
 	RWMutex lock, msglock;
 	int channel_counter = 0;
 	int session_counter = 0;
