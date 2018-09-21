@@ -42,7 +42,7 @@ void Client::Run() {
 				}
 				else {
 					double p = Randomf();
-					if (p < 0.1)		action = 300;
+					if (p < 0.1)		action = 301;
 					else if (p < 0.2)	action = 400;
 					else if (p < 0.3)	action = 500;
 					else if (p < 0.6)	action = 600;
@@ -56,6 +56,7 @@ void Client::Run() {
 					case 200:		Login();
 									RefreshUserlist();
 									break;
+					case 301:		Set("name", RandomName()); break;
 					//case 300:		Set(); break;
 					//case 400:		Get(); break;
 					case 500:		Join(RandomNewChannel()); break;
@@ -204,6 +205,11 @@ void Client::Join(String channel) {
 	Call(out, in);
 	
 	int ret = in.Get32();
+	if (ret == 1) {
+		Print("Client " + IntStr(id) + " WAS JOINED ALREADY AT channel " + channel);
+		return;
+	}
+	
 	if (ret != 0) throw Exc("Joining channel failed");
 	
 	joined_channels.Add(channel);
@@ -264,6 +270,44 @@ void Client::Poll() {
 		String message = in.Get(msg_len);
 		if (message.GetCount() != msg_len) throw Exc("Polling failed");
 		Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + message);
+		
+		int j = message.Find(" ");
+		if (j == -1) continue;
+		String key = message.Left(j);
+		message = message.Mid(j + 1);
+		
+		if (key == "msg") {
+			WhenMessage(sender_id, message);
+		}
+		else if (key == "join") {
+			Vector<String> args = Split(message, " ");
+			if (args.GetCount() != 3) throw Exc("Polling argument error");
+			String user_name = args[0];
+			int user_id = StrInt(args[1]);
+			String channel = args[2];
+			User& u = users.GetAdd(user_id);
+			u.name = user_name;
+			u.channels.Add(channel);
+		}
+		else if (key == "leave") {
+			Vector<String> args = Split(message, " ");
+			if (args.GetCount() != 3) throw Exc("Polling argument error");
+			String user_name = args[0];
+			int user_id = StrInt(args[1]);
+			String channel = args[2];
+			User& u = users.GetAdd(user_id);
+			u.name = user_name;
+			u.channels.RemoveKey(channel);
+		}
+		else if (key == "name") {
+			Vector<String> args = Split(message, " ");
+			if (args.GetCount() != 2) throw Exc("Polling argument error");
+			int user_id = StrInt(args[0]);
+			String user_name = args[1];
+			User& u = users.GetAdd(user_id);
+			u.name = user_name;
+		}
+		
 	}
 }
 
@@ -297,7 +341,7 @@ void Client::RefreshUserlist() {
 		if (name_len <= 0) continue;
 		String name = in.Get(name_len);
 		
-		User& u = users.GetAdd(name);
+		User& u = users.GetAdd(user_id);
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
@@ -305,6 +349,14 @@ void Client::RefreshUserlist() {
 	if (fail) throw Exc("Getting userlist failed");
 	
 	Print("Client " + IntStr(id) + " updated userlist (size " + IntStr(user_count) + ")");
+}
+
+String Client::RandomName() {
+	String s;
+	for(int i = 0; i < 8; i++)
+		s.Cat('A' + Random(25));
+	return s;
+	return s;
 }
 
 String Client::RandomNewChannel() {

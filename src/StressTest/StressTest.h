@@ -17,11 +17,11 @@ struct User : Moveable<User> {
 	Time last_update;
 	
 	// Detailed information
-	Vector<String> channels;
+	Index<String> channels;
 };
 
 class Client {
-	VectorMap<String, User> users;
+	VectorMap<int, User> users;
 	Index<String> joined_channels;
 	String pass;
 	One<TcpSocket> s;
@@ -29,6 +29,7 @@ class Client {
 	int user_id = -1;
 	
 	
+	String RandomName();
 	String RandomNewChannel();
 	String RandomOldChannel();
 	int RandomUser();
@@ -55,6 +56,9 @@ public:
 	void Get(const String& key, String& value);
 	void Poll();
 	void RefreshUserlist();
+	
+	Event<int, String> WhenMessage;
+	
 };
 
 #endif
