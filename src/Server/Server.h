@@ -35,7 +35,7 @@ class UserDatabase {
 	
 public:
 	UserDatabase();
-	void Init(int user_id);
+	int Init(int user_id);
 	void Deinit();
 	void Value(int size) {offsets.Add(record_size); record_size += size;}
 	bool IsOpen() const {return open;}
@@ -67,6 +67,7 @@ enum {
 
 class ServerDatabase {
 	FileAppend file;
+	int user_count = 0;
 	
 	static const int user_record = 200;
 	

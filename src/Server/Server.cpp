@@ -236,9 +236,9 @@ void ActiveSession::Run() {
 		Print("Error processing client from: " + s.GetPeerAddr());
 	}
 	
-	s.Close();
-	
 	Logout();
+	
+	s.Close();
 }
 
 void ActiveSession::Register(Stream& in, Stream& out) {
@@ -257,7 +257,10 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 	
 	server->db.Flush();
 	
-	db.Init(id);
+	if (db.Init(id)) {
+		server->lock.LeaveWrite();
+		throw Exc("DataBase init failed");
+	}
 	
 	db.SetStr(NICK, nick);
 	db.SetInt(PASSHASH, passhash);
@@ -272,9 +275,9 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 	db.SetDbl(LL_ELEVATION, 0);
 	db.SetTime(LL_UPDATED, Time(1970,1,1));
 	
-	db.AddChannel("oulu");
-	db.AddChannel("news");
-	db.AddChannel("testers");
+	//db.AddChannel("oulu");
+	//db.AddChannel("news");
+	//db.AddChannel("testers");
 	
 	db.Flush();
 	
@@ -294,7 +297,10 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 	if (pass.GetCount() != 8) throw Exc("Invalid login password");
 	int64 passhash = pass.GetHashValue();
 	
-	if (!db.IsOpen()) db.Init(user_id);
+	if (!db.IsOpen()) {
+		if (db.Init(user_id))
+			throw Exc("Database init failed");
+	}
 	
 	int64 correct_passhash = db.GetInt(PASSHASH);
 	if (passhash != correct_passhash) throw Exc("Invalid login password");
@@ -328,10 +334,13 @@ void ActiveSession::Logout() {
 		server->LeaveChannel(server->channels.Get(channels[0]).name, *this);
 	
 	// Dereference messages
-	lock.Enter();
-	for(int i = 0; i < inbox.GetCount(); i++) {
+	while (!inbox.IsEmpty()) {
 		try {
-			InboxMessage& msg = inbox[i];
+			lock.Enter();
+			if (inbox.IsEmpty()) {lock.Leave(); break;}
+			InboxMessage msg = inbox.Pop();
+			lock.Leave();
+			
 			MessageRef& ref = server->GetReference(msg.msg);
 			server->DecReference(ref);
 		}
@@ -339,8 +348,6 @@ void ActiveSession::Logout() {
 			Print("Messages deleted");
 		}
 	}
-	inbox.Clear();
-	lock.Leave();
 	
 	db.Deinit();
 }
@@ -373,7 +380,9 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 
 			Index<int> userlist;
 			GetUserlist(userlist);
+			server->lock.EnterRead();
 			server->SendMessage(user_id, "name " + IntStr(user_id) + " " + value, userlist);
+			server->lock.LeaveRead();
 		} else {
 			ret = 1;
 		}
@@ -510,7 +519,8 @@ void ActiveSession::Poll(Stream& in, Stream& out) {
 		MessageRef& ref = server->GetReference(im.msg);
 		int msg_len = ref.msg.GetCount();
 		out.Put32(msg_len);
-		out.Put(ref.msg.Begin(), msg_len);
+		if (msg_len > 0)
+			out.Put(ref.msg.Begin(), msg_len);
 		
 		server->DecReference(ref);
 	}

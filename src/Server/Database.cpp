@@ -16,7 +16,7 @@ UserDatabase::UserDatabase() {
 	Value(0); //CHANNEL_BEGIN
 }
 
-void UserDatabase::Init(int user_id) {
+int UserDatabase::Init(int user_id) {
 	this->user_id = user_id;
 	
 	String user_dir = ConfigFile("users");
@@ -26,12 +26,14 @@ void UserDatabase::Init(int user_id) {
 	String user_loc_file = AppendFileName(user_dir, IntStr(user_id) + "_loc.bin");
 	
 	if (!user.Open(user_file))
-		throw Exc("Couldn't open user file");
+		return 1;
 	
 	if (!location.Open(user_loc_file))
-		throw Exc("Couldn't open user location file");
+		return 1;
 	
 	open = true;
+	
+	return 0;
 }
 
 void UserDatabase::Deinit() {
@@ -214,11 +216,13 @@ void UserDatabase::DeleteChannel(int i) {
 }
 
 void UserDatabase::SetLocation(double longitude, double latitude, double elevation) {
+	Time now = GetUtcTime();
+	
 	SetDbl(LL_LON, longitude);
 	SetDbl(LL_LAT, latitude);
 	SetDbl(LL_ELEVATION, elevation);
+	SetTime(LL_UPDATED, now);
 	
-	Time now = GetUtcTime();
 	location.Put(&longitude, sizeof(double));
 	location.Put(&latitude, sizeof(double));
 	location.Put(&elevation, sizeof(double));
@@ -238,11 +242,13 @@ void ServerDatabase::Init() {
 	String srv_file = ConfigFile("server.bin");
 	if (!file.Open(srv_file))
 		throw Exc("Couldn't open server file");
+	
+	int64 size = file.GetSize();
+	user_count = size / user_record;
 }
 
 int ServerDatabase::GetUserCount() {
-	int64 size = file.GetSize();
-	return size / user_record;
+	return user_count;
 }
 
 void ServerDatabase::AddUser(String user) {
@@ -251,6 +257,7 @@ void ServerDatabase::AddUser(String user) {
 	file.Put(user.Begin(), user.GetCount());
 	for(int i = user.GetCount(); i < 200; i++)
 		file.Put("", 1);
+	user_count++;
 }
 
 int ServerDatabase::FindUser(const String& user) {
