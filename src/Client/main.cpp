@@ -1,14 +1,15 @@
 #include "Client.h"
 
+#define IMAGECLASS Images
 #define IMAGEFILE <Client/Client.iml>
 #include <Draw/iml_source.h>
 
-Client::Client()
-{
-	CtrlLayout(*this, "Window title");
-}
 
-GUI_APP_MAIN
-{
-	Client().Run();
+GUI_APP_MAIN {
+	
+	
+	Client c;
+	
+	c.Start();
+	c.Run();
 }
