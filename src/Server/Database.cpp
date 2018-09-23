@@ -31,6 +31,9 @@ int UserDatabase::Init(int user_id) {
 	if (!location.Open(user_loc_file))
 		return 1;
 	
+	if (user.GetSize() == 0) {
+		user.Put(0, offsets[CHANNEL_BEGIN]);
+	}
 	open = true;
 	
 	return 0;
@@ -243,8 +246,13 @@ void ServerDatabase::Init() {
 	if (!file.Open(srv_file))
 		throw Exc("Couldn't open server file");
 	
-	int64 size = file.GetSize();
-	user_count = size / user_record;
+	for (user_count = 0;; user_count++) {
+		if (!FileExists(AppendFileName(ConfigFile("users"), IntStr(user_count) + ".bin")))
+			break;
+	}
+	int total_size = user_count * user_record;
+	if (file.GetSize() < total_size)
+		file.Put(0, total_size - file.GetSize());
 }
 
 int ServerDatabase::GetUserCount() {
@@ -257,6 +265,7 @@ void ServerDatabase::AddUser(String user) {
 	file.Put(user.Begin(), user.GetCount());
 	for(int i = user.GetCount(); i < 200; i++)
 		file.Put("", 1);
+	file.Flush();
 	user_count++;
 }
 
@@ -290,6 +299,7 @@ void ServerDatabase::SetUser(int user_id, String value) {
 	file.Put(value.Begin(), value.GetCount());
 	for(int i = value.GetCount(); i < 200; i++)
 		file.Put("", 1);
+	file.Flush();
 }
 
 void ServerDatabase::Flush() {

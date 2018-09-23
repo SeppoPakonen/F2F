@@ -128,6 +128,7 @@ public:
 	void Leave(Stream& in, Stream& out);
 	void Location(Stream& in, Stream& out);
 	void Message(Stream& in, Stream& out);
+	void ChannelMessage(Stream& in, Stream& out);
 	void Poll(Stream& in, Stream& out);
 	void Get(Stream& in, Stream& out);
 	void Set(Stream& in, Stream& out);
