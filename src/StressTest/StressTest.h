@@ -23,7 +23,7 @@ struct User : Moveable<User> {
 class Client {
 	VectorMap<int, User> users;
 	Index<String> joined_channels;
-	String pass;
+	String user_name, pass;
 	One<TcpSocket> s;
 	int id = -1;
 	int user_id = -1;
@@ -55,6 +55,7 @@ public:
 	bool Set(const String& key, const String& value);
 	void Get(const String& key, String& value);
 	void Poll();
+	void ChannelMessage(String channel, const String& msg);
 	void RefreshUserlist();
 	
 	Event<int, String> WhenMessage;

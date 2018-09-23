@@ -15,11 +15,12 @@ void Print(const String& s) {
 Client::Client() {
 	
 }
-	
+
 void Client::Run() {
 	Print("Client " + IntStr(id) + " Running");
 	
 	int count = 0;
+	bool registered = false;
 	
 	while (!Thread::IsShutdownThreads()) {
 		if (!s.IsEmpty()) s.Clear();
@@ -30,14 +31,16 @@ void Client::Run() {
 			return;
 		}
 		
+		bool logged_in = false;
+		
 		try {
 			while (!Thread::IsShutdownThreads() && s->IsOpen()) {
 				
 				int action;
-				if (count == 0) {
+				if (!registered) {
 					action = 100;
 				}
-				else if (count == 1) {
+				else if (!logged_in) {
 					action = 200;
 				}
 				else {
@@ -48,13 +51,15 @@ void Client::Run() {
 					else if (p < 0.6)	action = 600;
 					else if (p < 0.7)	action = 700;
 					else if (p < 0.8)	action = 800;
-					else				action = 900;
+					else if (p < 0.9)	action = 900;
+					else				action = 1000;
 				}
 				
 				switch (action) {
-					case 100:		Register(); break;
+					case 100:		Register(); registered = true; break;
 					case 200:		Login();
 									RefreshUserlist();
+									logged_in = true;
 									break;
 					case 301:		Set("name", RandomName()); break;
 					//case 300:		Set(); break;
@@ -64,6 +69,7 @@ void Client::Run() {
 					case 700:		Message(RandomUser(), RandomMessage()); break;
 					case 800:		Poll(); break;
 					case 900:		SendLocation(RandomLocation()); break;
+					case 1000:		ChannelMessage(RandomOldChannel(), RandomMessage()); break;
 				}
 				
 				Sleep(Random(1000));
@@ -72,11 +78,9 @@ void Client::Run() {
 		}
 		catch (Exc e) {
 			Print("Client " + IntStr(id) + " Error: " + e);
-			count = min(count, 1);
 		}
 		catch (const char* e) {
 			Print("Client " + IntStr(id) + " Error: " + e);
-			count = min(count, 1);
 		}
 		catch (...) {
 			Print("Client " + IntStr(id) + " Unexpected error");
@@ -146,7 +150,10 @@ void Client::Login() {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Login failed");
 	
-	Print("Client " + IntStr(id) + " logged in (" + IntStr(user_id) + ", " + pass + ")");
+	int name_len = in.Get32();
+	user_name = in.Get(name_len);
+	
+	Print("Client " + IntStr(id) + " logged in (" + IntStr(user_id) + ", " + pass + ") nick: " + user_name);
 }
 
 bool Client::Set(const String& key, const String& value) {
@@ -267,7 +274,9 @@ void Client::Poll() {
 	for(int i = 0; i < count; i++) {
 		int sender_id = in.Get32();
 		int msg_len = in.Get32();
-		String message = in.Get(msg_len);
+		String message;
+		if (msg_len > 0)
+			message = in.Get(msg_len);
 		if (message.GetCount() != msg_len) throw Exc("Polling failed");
 		Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + message);
 		
@@ -279,14 +288,19 @@ void Client::Poll() {
 		if (key == "msg") {
 			WhenMessage(sender_id, message);
 		}
+		else if (key == "chmsg") {
+			
+		}
 		else if (key == "join") {
 			Vector<String> args = Split(message, " ");
 			if (args.GetCount() != 3) throw Exc("Polling argument error");
 			String user_name = args[0];
 			int user_id = StrInt(args[1]);
 			String channel = args[2];
+			ASSERT(user_id != this->user_id && user_id >= 0);
 			User& u = users.GetAdd(user_id);
 			u.name = user_name;
+			u.user_id = user_id;
 			u.channels.Add(channel);
 		}
 		else if (key == "leave") {
@@ -295,8 +309,10 @@ void Client::Poll() {
 			String user_name = args[0];
 			int user_id = StrInt(args[1]);
 			String channel = args[2];
+			ASSERT(user_id != this->user_id);
 			User& u = users.GetAdd(user_id);
 			u.name = user_name;
+			u.user_id = user_id;
 			u.channels.RemoveKey(channel);
 			if (u.channels.IsEmpty())
 				users.RemoveKey(user_id);
@@ -306,8 +322,10 @@ void Client::Poll() {
 			if (args.GetCount() != 2) throw Exc("Polling argument error");
 			int user_id = StrInt(args[0]);
 			String user_name = args[1];
+			ASSERT(user_id != this->user_id);
 			User& u = users.GetAdd(user_id);
 			u.name = user_name;
+			u.user_id = user_id;
 		}
 		
 	}
@@ -330,6 +348,25 @@ void Client::SendLocation(const Location& l) {
 	Print("Client " + IntStr(id) + " updated location");
 }
 
+void Client::ChannelMessage(String channel, const String& msg) {
+	if (channel.IsEmpty()) return;
+	StringStream out, in;
+	
+	out.Put32(1000);
+	
+	out.Put32(channel.GetCount());
+	out.Put(channel.Begin(), channel.GetCount());
+	out.Put32(msg.GetCount());
+	out.Put(msg.Begin(), msg.GetCount());
+	
+	Call(out, in);
+	
+	int ret = in.Get32();
+	if (ret != 0) throw Exc("Message sending failed");
+	
+	Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + channel + ": " + msg);
+}
+
 void Client::RefreshUserlist() {
 	String userlist_str;
 	Get("userlist", userlist_str);
@@ -343,10 +380,19 @@ void Client::RefreshUserlist() {
 		if (name_len <= 0) continue;
 		String name = in.Get(name_len);
 		
+		ASSERT(user_id != this->user_id);
 		User& u = users.GetAdd(user_id);
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
+		
+		int channel_count = in.Get32();
+		if (channel_count < 0 || channel_count >= 200) {fail = true; continue;}
+		for(int j = 0; j < channel_count; j++) {
+			int ch_len = in.Get32();
+			String ch_name = in.Get(ch_len);
+			u.channels.Add(ch_name);
+		}
 	}
 	if (fail) throw Exc("Getting userlist failed");
 	
@@ -387,7 +433,9 @@ String Client::RandomOldChannel() {
 
 int Client::RandomUser() {
 	if (users.IsEmpty()) return user_id;
-	return users[Random(users.GetCount())].user_id;
+	int id = users[Random(users.GetCount())].user_id;
+	ASSERT(id != this->user_id);
+	return id;
 }
 
 String Client::RandomMessage() {
@@ -429,7 +477,7 @@ CONSOLE_APP_MAIN
 {
 	Array<Client> clients;
 	
-	for(int i = 0; i < 100; i++) {
+	for(int i = 0; i < 1; i++) {
 		Client& c = clients.Add();
 		c.SetId(i);
 		c.Start();
