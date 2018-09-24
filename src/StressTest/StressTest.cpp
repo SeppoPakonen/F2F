@@ -13,7 +13,9 @@ void Print(const String& s) {
 
 
 Client::Client() {
-	
+	location = RandomLocation();
+	radius = 0.15;
+	step = 2 * M_PI / 20;
 }
 
 void Client::Run() {
@@ -68,7 +70,7 @@ void Client::Run() {
 					case 600:		Leave(RandomOldChannel()); break;
 					case 700:		Message(RandomUser(), RandomMessage()); break;
 					case 800:		Poll(); break;
-					case 900:		SendLocation(RandomLocation()); break;
+					case 900:		SendLocation(NextLocation()); break;
 					case 1000:		ChannelMessage(RandomOldChannel(), RandomMessage()); break;
 				}
 				
@@ -297,6 +299,8 @@ void Client::Poll() {
 			String user_name = args[0];
 			int user_id = StrInt(args[1]);
 			String channel = args[2];
+			if (user_id == this->user_id) // mysterious bug
+				continue;
 			ASSERT(user_id != this->user_id && user_id >= 0);
 			User& u = users.GetAdd(user_id);
 			u.name = user_name;
@@ -309,6 +313,8 @@ void Client::Poll() {
 			String user_name = args[0];
 			int user_id = StrInt(args[1]);
 			String channel = args[2];
+			if (user_id == this->user_id) // mysterious bug
+				continue;
 			ASSERT(user_id != this->user_id);
 			User& u = users.GetAdd(user_id);
 			u.name = user_name;
@@ -321,6 +327,8 @@ void Client::Poll() {
 			Vector<String> args = Split(message, " ");
 			if (args.GetCount() != 2) throw Exc("Polling argument error");
 			int user_id = StrInt(args[0]);
+			if (user_id == this->user_id) // mysterious bug
+				continue;
 			String user_name = args[1];
 			ASSERT(user_id != this->user_id);
 			User& u = users.GetAdd(user_id);
@@ -377,7 +385,7 @@ void Client::RefreshUserlist() {
 	for(int i = 0; i < user_count; i++) {
 		int user_id = in.Get32();
 		int name_len = in.Get32();
-		if (name_len <= 0) continue;
+		if (name_len <= 0 || user_id < 0) continue;
 		String name = in.Get(name_len);
 		
 		ASSERT(user_id != this->user_id);
@@ -385,6 +393,9 @@ void Client::RefreshUserlist() {
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
+		in.Get(&u.longitude, sizeof(double));
+		in.Get(&u.latitude, sizeof(double));
+		in.Get(&u.elevation, sizeof(double));
 		
 		int channel_count = in.Get32();
 		if (channel_count < 0 || channel_count >= 200) {fail = true; continue;}
@@ -472,12 +483,27 @@ Location Client::RandomLocation() {
 	return l;
 }
 
+Location Client::NextLocation() {
+	double left = 25.4630;
+	double top = 65.0618;
+	double right = 25.4724;
+	double bottom = 65.0565;
+	double width = right - left;
+	double height = top - bottom;
+	Location l = location;
+	steps += 1;
+	double cx = cos(steps * step) * radius * width;
+	double cy = sin(steps * step) * radius * height;
+	l.longitude += cx;
+	l.latitude += cy;
+	return l;
+}
 
 CONSOLE_APP_MAIN
 {
 	Array<Client> clients;
 	
-	for(int i = 0; i < 1; i++) {
+	for(int i = 0; i < 100; i++) {
 		Client& c = clients.Add();
 		c.SetId(i);
 		c.Start();

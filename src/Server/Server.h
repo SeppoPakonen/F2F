@@ -25,39 +25,33 @@ enum {
 
 
 class UserDatabase {
+	
+	// Temporary
+	SpinLock lock;
+	String user_file, user_loc_file;
+	FileAppend location;
 	int user_id = -1;
-	FileAppend user, location;
-	Vector<int> offsets;
-	int record_size = 0;
 	bool open = false;
 	
-	static const int channel_record = 200+sizeof(Time);
 	
 public:
 	UserDatabase();
 	int Init(int user_id);
 	void Deinit();
-	void Value(int size) {offsets.Add(record_size); record_size += size;}
 	bool IsOpen() const {return open;}
 	
-	void SetTime(int key, Time value);
-	void SetStr(int key, String value);
-	void SetInt(int key, int64 value);
-	void SetDbl(int key, double value);
 	
+	// Persistent
+	Index<String> channels;
+	String nick;
+	int64 passhash = 0;
+	Time joined, lastlogin;
+	int64 logins = 0, onlinetotal = 0, visibletotal = 0;
+	double longitude = 0, latitude = 0, elevation = 0;
+	Time lastupdate;
+	
+	void Serialize(Stream& s) {s % nick % channels % passhash % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate;}
 	void Flush();
-	
-	int64 GetInt(int key);
-	String GetString(int key);
-	Time GetTime(int key);
-	double GetDbl(int key);
-	
-	int AddChannel(const String& channel);
-	int GetChannelCount();
-	String GetChannel(int i);
-	int FindChannel(const String& channel);
-	void DeleteChannel(int i);
-	
 	void SetLocation(double longitude, double latitude, double elevation);
 };
 
@@ -66,21 +60,23 @@ enum {
 };
 
 class ServerDatabase {
-	FileAppend file;
-	int user_count = 0;
 	
-	static const int user_record = 200;
+	// Persistent
+	VectorMap<int, String> users;
+	
+	// Temporary
+	String srv_file;
 	
 public:
 	ServerDatabase();
 	
 	void Init();
-	int GetUserCount();
-	void AddUser(String user);
-	int FindUser(const String& user);
-	void SetUser(int user_id, String name);
-	String GetUser(int i);
+	int GetUserCount() {return users.GetCount();}
+	void AddUser(int id, String user) {users.Add(id, user);}
+	void SetUser(int user_id, String name) {users.Get(user_id) = name;}
+	String GetUser(int i) {return users[i];}
 	
+	void Serialize(Stream& s) {s % users;}
 	void Flush();
 	
 };
@@ -95,6 +91,8 @@ struct Channel {
 	String name;
 	int id;
 };
+
+UserDatabase& GetDatabase(int user_id);
 
 class ActiveSession {
 	
@@ -112,7 +110,6 @@ protected:
 	Vector<InboxMessage> inbox;
 	Index<int> channels;
 	
-	UserDatabase db;
 	
 public:
 	typedef ActiveSession CLASSNAME;

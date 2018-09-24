@@ -9,6 +9,11 @@ file
 	Client.cpp,
 	Client.lay,
 	Client.iml,
+	GoogleMaps.h,
+	GoogleMaps.cpp,
+	GoogleMaps.lay,
+	GoogleMaps.iml,
+	MapDlg.cpp,
 	AES.h,
 	AES.cpp;
 

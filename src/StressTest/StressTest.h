@@ -18,6 +18,7 @@ struct User : Moveable<User> {
 	
 	// Detailed information
 	Index<String> channels;
+	double longitude = 0, latitude = 0, elevation = 0;
 };
 
 class Client {
@@ -28,6 +29,10 @@ class Client {
 	int id = -1;
 	int user_id = -1;
 	
+	Location location;
+	double radius, step, steps = 0;
+	
+	
 	
 	String RandomName();
 	String RandomNewChannel();
@@ -35,6 +40,7 @@ class Client {
 	int RandomUser();
 	String RandomMessage();
 	Location RandomLocation();
+	Location NextLocation();
 	
 public:
 	typedef Client CLASSNAME;

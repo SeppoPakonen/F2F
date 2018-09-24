@@ -17,10 +17,15 @@ Client::Client() {
 	Title("F2F Client program");
 	Sizeable().MaximizeBox().MinimizeBox();
 	
-	Add(irc.SizePos());
+	Add(split.SizePos());
+	split << irc << map;
+	split.Horz();
+	split.SetPos(6666);
 	
 	irc.WhenCommand << THISBACK(Command);
 	irc.WhenChannelChanged << THISBACK(RefreshGuiChannel);
+	
+	map.Set(Pointf(25.46748, 65.05919));
 }
 
 
@@ -32,6 +37,8 @@ void Client::Connect() {
 	while (!Thread::IsShutdownThreads()) {
 		if (!s.IsEmpty()) s.Clear();
 		s.Create();
+		
+		is_logged_in = false;
 		
 		if(!s->Connect("127.0.0.1", 17000)) {
 			Print("Client " + IntStr(user_id) + " Unable to connect to server!");
@@ -120,7 +127,7 @@ void Client::Register() {
 	
 	in.Get(&user_id, sizeof(int));
 	pass = in.Get(8);
-	if (pass.GetCount() != 8) throw Exc("Invalid  password");
+	if (pass.GetCount() != 8) throw Exc("Invalid password");
 	
 	Print("Client " + IntStr(user_id) + " registered (pass " + pass + ")");
 }
@@ -206,6 +213,7 @@ void Client::Join(String channel) {
 	
 	if (ret != 0) throw Exc("Joining channel failed");
 	
+	my_channels.FindAdd(channel);
 	channels.FindAdd(channel);
 	PostCallback(THISBACK(RefreshGui));
 	
@@ -227,7 +235,7 @@ void Client::Leave(String channel) {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Leaving channel failed");
 	
-	channels.RemoveKey(channel);
+	my_channels.RemoveKey(channel);
 	PostCallback(THISBACK(RefreshGui));
 	
 	Print("Client " + IntStr(user_id) + " left from channel " + channel);
@@ -258,15 +266,17 @@ void Client::Poll() {
 	
 	Call(out, in);
 	
+	lock.Enter();
+	
 	int count = in.Get32();
-	if (count < 0 || count >= 10000) throw Exc("Polling failed");
+	if (count < 0 || count >= 10000) {lock.Leave(); throw Exc("Polling failed");}
 	for(int i = 0; i < count; i++) {
 		int sender_id = in.Get32();
 		int msg_len = in.Get32();
 		String message;
 		if (msg_len > 0)
 			message = in.Get(msg_len);
-		if (message.GetCount() != msg_len) throw Exc("Polling failed");
+		if (message.GetCount() != msg_len) {lock.Leave(); throw Exc("Polling failed");}
 		Print("Client " + IntStr(user_id) + " received from " + IntStr(sender_id) + ": " + message);
 		
 		int j = message.Find(" ");
@@ -278,6 +288,7 @@ void Client::Poll() {
 			String ch_name = "user" + IntStr(sender_id);
 			ASSERT(sender_id != this->user_id);
 			User& u = users.GetAdd(sender_id);
+			my_channels.FindAdd(ch_name);
 			Channel& ch = channels.GetAdd(ch_name);
 			ch.Post(sender_id, u.name, message);
 			PostCallback(THISBACK(RefreshGui));
@@ -294,7 +305,7 @@ void Client::Poll() {
 		}
 		else if (key == "join") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 3) throw Exc("Polling argument error");
+			if (args.GetCount() != 3) {lock.Leave(); throw Exc("Polling argument error");}
 			String user_name = args[0];
 			int user_id = StrInt(args[1]);
 			ASSERT(user_id != this->user_id);
@@ -310,7 +321,7 @@ void Client::Poll() {
 		}
 		else if (key == "leave") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 3) throw Exc("Polling argument error");
+			if (args.GetCount() != 3) {lock.Leave(); throw Exc("Polling argument error");}
 			String user_name = args[0];
 			int user_id = StrInt(args[1]);
 			ASSERT(user_id != this->user_id);
@@ -328,7 +339,7 @@ void Client::Poll() {
 		}
 		else if (key == "name") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 2) throw Exc("Polling argument error");
+			if (args.GetCount() != 2) {lock.Leave(); throw Exc("Polling argument error");}
 			int user_id = StrInt(args[0]);
 			ASSERT(user_id != this->user_id);
 			String user_name = args[1];
@@ -341,8 +352,28 @@ void Client::Poll() {
 			u.user_id = user_id;
 			PostCallback(THISBACK(RefreshGui));
 		}
-		
+		else if (key == "loc") {
+			Vector<String> args = Split(message, " ");
+			if (args.GetCount() != 4) {lock.Leave(); throw Exc("Polling argument error");}
+			int user_id = StrInt(args[0]);
+			double lon = StrDbl(args[1]);
+			double lat = StrDbl(args[2]);
+			double elev = StrDbl(args[3]);
+			int i = users.Find(user_id);;
+			if (i == -1) continue;
+			User& u = users[i];
+			u.last_update = GetSysTime();
+			u.longitude = lon;
+			u.latitude = lat;
+			u.elevation = elev;
+			for(int i = 0; i < u.channels.GetCount(); i++) {
+				Channel& ch = channels.GetAdd(u.channels[i]);
+				ch.Post(-1, "Server", Format("User %s changed location to %f %f %f", u.name, lon, lat, elev));
+			}
+		}
 	}
+	
+	lock.Leave();
 }
 
 void Client::SendLocation(const Location& l) {
@@ -387,7 +418,7 @@ void Client::RefreshChannellist() {
 	MemReadStream in(channellist_str.Begin(), channellist_str.GetCount());
 	
 	Index<String> ch_rem;
-	for(int i = 0; i < channels.GetCount(); i++) ch_rem.Add(channels.GetKey(i));
+	for(int i = 0; i < my_channels.GetCount(); i++) ch_rem.Add(my_channels[i]);
 	
 	int ch_count = in.Get32();
 	bool fail = false;
@@ -398,12 +429,18 @@ void Client::RefreshChannellist() {
 		
 		if (ch_rem.Find(name) != -1) ch_rem.RemoveKey(name);
 		
+		my_channels.FindAdd(name);
 		Channel& ch = channels.GetAdd(name);
 	}
 	if (fail) throw Exc("Getting channellist failed");
 	
 	for(int i = 0; i < ch_rem.GetCount(); i++)
-		channels.RemoveKey(ch_rem[i]);
+		my_channels.RemoveKey(ch_rem[i]);
+	
+	if (!my_channels.IsEmpty() && irc.GetActiveChannel().IsEmpty()) {
+		irc.SetActiveChannel(my_channels[0]);
+		PostCallback(THISBACK(RefreshGuiChannel));
+	}
 	
 	Print("Client " + IntStr(user_id) + " updated channellist (size " + IntStr(ch_count) + ")");
 }
@@ -418,13 +455,16 @@ void Client::RefreshUserlist() {
 	for(int i = 0; i < user_count; i++) {
 		int user_id = in.Get32();
 		int name_len = in.Get32();
-		if (name_len <= 0) continue;
+		if (name_len <= 0 || user_id < 0) continue;
 		String name = in.Get(name_len);
 		
 		User& u = users.GetAdd(user_id);
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
+		in.Get(&u.longitude, sizeof(double));
+		in.Get(&u.latitude, sizeof(double));
+		in.Get(&u.elevation, sizeof(double));
 		
 		int channel_count = in.Get32();
 		if (channel_count < 0 || channel_count >= 200) {fail = true; continue;}
@@ -442,12 +482,16 @@ void Client::RefreshUserlist() {
 }
 
 void Client::RefreshGui() {
-	ChannelList& cl = irc.GetChannelList();
-	cl.SetChannelCount(channels.GetCount());
+	lock.Enter();
 	
-	for(int i = 0; i < channels.GetCount(); i++) {
-		cl.SetChannelName(i, channels.GetKey(i));
-		cl.SetChannelUnread(i, channels[i].unread);
+	ChannelList& cl = irc.GetChannelList();
+	cl.SetChannelCount(my_channels.GetCount());
+	
+	for(int i = 0; i < my_channels.GetCount(); i++) {
+		String ch_name = my_channels[i];
+		Channel& ch = channels.GetAdd(ch_name);
+		cl.SetChannelName(i, ch_name);
+		cl.SetChannelUnread(i, ch.unread);
 	}
 	
 	String active_channel = irc.GetActiveChannel();
@@ -461,11 +505,17 @@ void Client::RefreshGui() {
 		ch.unread = 0;
 		
 		irc.SetUserCount(ch.userlist.GetCount());
+		map.SetPersonCount(ch.userlist.GetCount());
 		for(int i = 0; i < ch.userlist.GetCount(); i++) {
 			User& u = users.GetAdd(ch.userlist[i]);
 			irc.SetUser(i, u.name);
+			map.SetPerson(i, Pointf(u.longitude, u.latitude));
 		}
 	}
+	
+	lock.Leave();
+	
+	map.map.Refresh();
 }
 
 void Client::RefreshGuiChannel() {
@@ -498,9 +548,9 @@ void Client::Command(String cmd) {
 		String key = args[0];
 		if (key == "join") {
 			if (args.GetCount() < 2) return;
-			String channel = args[1];
-			Join(channel);
-			irc.SetActiveChannel(channel);
+			String ch_name = args[1];
+			Join(ch_name);
+			irc.SetActiveChannel(ch_name);
 			RefreshGuiChannel();
 		}
 		else if (key == "leave") {
@@ -523,13 +573,59 @@ void Client::Command(String cmd) {
 				RefreshGui();
 			}
 		}
+		else if (key == "msg") {
+			if (args.GetCount() < 2) return;
+			String user = args[1];
+			args.Remove(0, 2);
+			String message = Upp::Join(args, " ");
+			int recv_id = -1;
+			for(int i = 0; i < users.GetCount(); i++) {
+				if (users[i].name == user) {
+					recv_id = users.GetKey(i);
+					break;
+				}
+			}
+			if (recv_id == -1) return;
+			String ch_name = "user" + IntStr(recv_id);
+			if (recv_id == this->user_id) return;
+			User& u = users.GetAdd(recv_id);
+			my_channels.FindAdd(ch_name);
+			Channel& ch = channels.GetAdd(ch_name);
+			ch.Post(user_id, user_name, message);
+			try {
+				Message(recv_id, message);
+			}
+			catch (Exc e) {
+				ch.Post(-1, "F2F client", "Problems sending messages...");
+			}
+			PostCallback(THISBACK(RefreshGui));
+		}
 	}
 	else {
 		String active_channel = irc.GetActiveChannel();
 		Channel& ch = channels.GetAdd(active_channel);
 		ch.Post(user_id, user_name, cmd);
-		RefreshGui();
-		SendChannelMessage(active_channel, cmd);
+		if (active_channel.Left(4) != "user") {
+			RefreshGui();
+			try {
+				SendChannelMessage(active_channel, cmd);
+			}
+			catch (Exc e) {
+				ch.Post(-1, "F2F client", "Problems sending messages...");
+			}
+		} else {
+			int recv_id = ScanInt(active_channel.Mid(4));
+			int i = users.Find(recv_id);
+			if (i == -1) return;
+			User& u = users.GetAdd(recv_id);
+			try {
+				Message(recv_id, cmd);
+			}
+			catch (Exc e) {
+				ch.Post(-1, "F2F client", "Problems sending messages...");
+			}
+			PostCallback(THISBACK(RefreshGui));
+		}
 	}
 }
 

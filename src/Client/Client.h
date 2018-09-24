@@ -2,7 +2,7 @@
 #define _Client_Client_h
 
 #include <CtrlLib/CtrlLib.h>
-
+#include "GoogleMaps.h"
 using namespace Upp;
 
 #define LAYOUTFILE <Client/Client.lay>
@@ -28,6 +28,7 @@ struct User : Moveable<User> {
 	
 	// Detailed information
 	Index<String> channels;
+	double longitude = 0, latitude = 0, elevation = 0;
 };
 
 struct ChannelMessage : Moveable<ChannelMessage> {
@@ -90,13 +91,17 @@ class Client : public TopWindow {
 	// Session
 	ArrayMap<String, Channel> channels;
 	ArrayMap<int, User> users;
+	Index<String> my_channels;
 	String user_name, pass;
 	One<TcpSocket> s;
 	int user_id = -1;
 	bool is_registered = false, is_logged_in = false;
+	Mutex lock;
 	
 	
+	Splitter split;
 	IrcCtrl irc;
+	MapDlgDlg map;
 	
 public:
 	typedef Client CLASSNAME;
