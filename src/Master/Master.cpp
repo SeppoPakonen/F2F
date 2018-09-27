@@ -33,16 +33,14 @@ void Master::Run() {
 
 void Master::Session(One<TcpSocket> t) {
 	try {
-		String addr;
 		uint16 port;
-		int i, r, addr_len;
+		int i, r;
 		
-		r = t->Get(&addr_len, sizeof(uint32));
-		if (r != sizeof(uint32)) throw Exc("Reading remote address failed");
-		if (addr_len < 0 || addr_len >= 200) throw Exc("Invalid address");
+		r = t->Get(&port, sizeof(uint16));
+		if (r != sizeof(uint16)) throw Exc("Invalid port");
 		
 		// Asks only server list
-		if (addr_len == 0) {
+		if (port == 0) {
 			lock.EnterRead();
 			i = servers.GetCount();
 			t->Put(&i, sizeof(int));
@@ -58,21 +56,19 @@ void Master::Session(One<TcpSocket> t) {
 		
 		// Registers a server
 		else {
-			addr = t->Get(addr_len);
-			if (addr.GetCount() != addr_len) throw Exc("Invalid address");
-			
-			r = t->Get(&port, sizeof(uint16));
-			if (r != sizeof(uint16)) throw Exc("Invalid port");
-			
 			TcpSocket test;
-			if (test.Connect(addr, port)) {
+			if (test.Connect(t->GetPeerAddr(), port)) {
 				lock.EnterWrite();
 				Server& s = servers.Add();
-				s.addr = addr;
+				s.addr = t->GetPeerAddr();
 				s.port = port;
 				StoreThis();
 				lock.LeaveWrite();
+				i = 0;
+			} else {
+				i = -1;
 			}
+			t->Put(&i, sizeof(int));
 		}
 	}
 	catch (Exc e) {
