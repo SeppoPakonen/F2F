@@ -57,16 +57,27 @@ void Master::Session(One<TcpSocket> t) {
 		// Registers a server
 		else {
 			TcpSocket test;
+			i = -1;
 			if (test.Connect(t->GetPeerAddr(), port)) {
-				lock.EnterWrite();
-				Server& s = servers.Add();
-				s.addr = t->GetPeerAddr();
-				s.port = port;
-				StoreThis();
-				lock.LeaveWrite();
-				i = 0;
-			} else {
-				i = -1;
+				int chk1 = 12345678;
+				int r = test.Put(&chk1, sizeof(int));
+				if (r == sizeof(int)) {
+					int chk2 = 0;
+					r = test.Get(&chk2, sizeof(int));
+					if (r == sizeof(int) && chk2 == chk1) {
+						Print("Connected to " + t->GetPeerAddr() + ":" + IntStr(port));
+						lock.EnterWrite();
+						Server& s = servers.Add();
+						s.addr = t->GetPeerAddr();
+						s.port = port;
+						StoreThis();
+						lock.LeaveWrite();
+						i = 0;
+					}
+				}
+			}
+			if (i == -1) {
+				Print("Couldn't connect to " + t->GetPeerAddr() + ":" + IntStr(port));
 			}
 			t->Put(&i, sizeof(int));
 		}
