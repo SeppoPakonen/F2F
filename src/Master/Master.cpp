@@ -70,6 +70,7 @@ void Master::Session(One<TcpSocket> t) {
 				Server& s = servers.Add();
 				s.addr = addr;
 				s.port = port;
+				StoreThis();
 				lock.LeaveWrite();
 			}
 		}
