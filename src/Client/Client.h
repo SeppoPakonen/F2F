@@ -93,9 +93,12 @@ class Client : public TopWindow {
 	ArrayMap<int, User> users;
 	Index<String> my_channels;
 	String user_name, pass;
+	String addr = "127.0.0.1";
 	One<TcpSocket> s;
 	int user_id = -1;
+	int port = 17000;
 	bool is_registered = false, is_logged_in = false;
+	bool running = false, stopped = true;
 	Mutex lock;
 	
 	
@@ -106,11 +109,17 @@ class Client : public TopWindow {
 public:
 	typedef Client CLASSNAME;
 	Client();
+	~Client();
 	
 	
-	void Connect();
-	void Start() {Thread::Start(THISBACK(Connect));}
+	bool Connect();
+	void CloseConnection() {if (!s.IsEmpty()) s->Close();}
+	bool LoginScript();
+	bool RegisterScript();
+	void HandleConnection();
+	void Start() {if (!stopped) return; stopped = false; running = true; Thread::Start(THISBACK(HandleConnection));}
 	void Call(Stream& out, Stream& in);
+	void SetAddress(String a, int p) {addr = a; port = p;}
 	
 	void Register();
 	void Login();
@@ -124,10 +133,80 @@ public:
 	void Poll();
 	void RefreshChannellist();
 	void RefreshUserlist();
+	void ChangeLocation(Pointf coord);
 	
 	void RefreshGui();
 	void RefreshGuiChannel();
 	void Command(String cmd);
+	
+	bool IsConnected() {return !s.IsEmpty() && s->IsOpen() && is_logged_in;}
+	
+};
+
+class PreviewImage : public ImageCtrl {
+	void SetData(const Value& val) {
+		String path = val;
+		if(IsNull(path.IsEmpty()))
+			SetImage(Null);
+		else
+			SetImage(StreamRaster::LoadFileAny(~path));
+	}
+};
+
+class StartupDialog : public WithStartupDialog<TopWindow> {
+	
+	// Persistent
+	Image profile_image;
+	String name, srv_addr;
+	int srv_port;
+	bool autoconnect = false;
+	
+	// Temporary
+	Client& cl;
+	bool connecting = false;
+	
+public:
+	typedef StartupDialog CLASSNAME;
+	StartupDialog(Client& c);
+	
+	void StartTryConnect() {Enable(false); Thread::Start(THISBACK(TryConnect));}
+	void StartStopConnect() {Thread::Start(THISBACK(StopConnect));}
+	void TryConnect();
+	void StopConnect();
+	void Close0() {Close();}
+	void SetError(String e) {error.SetLabel(e);}
+	void Enable(bool b);
+	bool Connect();
+	void SelectServer();
+	void SelectImage();
+	
+	bool IsAutoConnect() const {return autoconnect;}
+	
+	void StoreThis() {StoreToFile(*this, ConfigFile("Startup.bin"));}
+	void LoadThis() {LoadFromFile(*this, ConfigFile("Startup.bin"));}
+	void Serialize(Stream& s) {s % profile_image % name % srv_addr % srv_port % autoconnect;}
+	
+};
+
+class ServerDialog : public WithSelectServer<TopWindow> {
+	StartupDialog& sd;
+	
+protected:
+	friend class StartupDialog;
+	
+	struct Server : Moveable<Server> {
+		String addr;
+		uint16 port;
+	};
+	Vector<Server> servers;
+	
+	
+public:
+	typedef ServerDialog CLASSNAME;
+	ServerDialog(StartupDialog& sd);
+	
+	void RefreshAddresses();
+	void TestConnection(int i);
 	
 };
 

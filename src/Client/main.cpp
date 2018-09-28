@@ -6,10 +6,20 @@
 
 
 GUI_APP_MAIN {
-	
+	SetIniFile(ConfigFile("Client.ini"));
 	
 	Client c;
+	StartupDialog startup(c);
 	
-	c.Start();
-	c.Run();
+	if (!startup.IsAutoConnect()) {
+		startup.Run();
+	} else {
+		if (!startup.Connect())
+			startup.Run();
+	}
+	
+	if (c.IsConnected()) {
+		c.Start();
+		c.Run();
+	}
 }

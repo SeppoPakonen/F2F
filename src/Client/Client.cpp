@@ -1,6 +1,12 @@
 #include "Client.h"
 #include "AES.h"
 
+namespace Config {
+
+INI_STRING(master_addr, "93.170.105.68", "Master server's address");
+INI_INT(master_port, 17123, "Master server's port");
+
+};
 
 void Print(const String& s) {
 	static Mutex lock;
@@ -26,46 +32,77 @@ Client::Client() {
 	irc.WhenChannelChanged << THISBACK(RefreshGuiChannel);
 	
 	map.Set(Pointf(25.46748, 65.05919));
+	map.WhenHome << THISBACK(ChangeLocation);
 }
 
+Client::~Client() {
+	running = false;
+	if (!s.IsEmpty()) s->Close();
+	while (!stopped) Sleep(100);
+}
 
-void Client::Connect() {
+bool Client::Connect() {
+	if (s.IsEmpty() || !s->IsOpen()) {
+		is_logged_in = false;
+		
+		if (!s.IsEmpty()) s.Clear();
+		s.Create();
+		
+		if(!s->Connect(addr, port)) {
+			Print("Client " + IntStr(user_id) + " Unable to connect to server!");
+			return false;
+		}
+	}
+	return true;
+}
+
+bool Client::RegisterScript() {
+	if (!is_registered) {
+		try {
+			Register();
+			is_registered = true;
+		}
+		catch (Exc e) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool Client::LoginScript() {
+	if (!is_logged_in) {
+		try {
+			Login();
+			RefreshChannellist();
+			RefreshUserlist();
+			is_logged_in = true;
+			PostCallback(THISBACK(RefreshGui));
+		}
+		catch (Exc e) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void Client::HandleConnection() {
 	Print("Client " + IntStr(user_id) + " Running");
 	
 	int count = 0;
 	
-	while (!Thread::IsShutdownThreads()) {
-		if (!s.IsEmpty()) s.Clear();
-		s.Create();
+	while (!Thread::IsShutdownThreads() && running) {
 		
-		is_logged_in = false;
-		
-		if(!s->Connect("127.0.0.1", 17000)) {
-			Print("Client " + IntStr(user_id) + " Unable to connect to server!");
-			return;
-		}
+		Connect();
 		
 		try {
-			while (!Thread::IsShutdownThreads() && s->IsOpen()) {
+			while (!Thread::IsShutdownThreads() && s->IsOpen() && running) {
 				
+				RegisterScript();
+				LoginScript();
 				
-				if (!is_registered) {
-					Register();
-					is_registered = true;
-				}
-				else if (!is_logged_in) {
-					Login();
-					RefreshChannellist();
-					RefreshUserlist();
-					is_logged_in = true;
-
-					PostCallback(THISBACK(RefreshGui));
-				}
-				else {
-					Poll();
-					Sleep(1000);
-					count++;
-				}
+				Poll();
+				Sleep(1000);
+				count++;
 			}
 		}
 		catch (Exc e) {
@@ -80,10 +117,12 @@ void Client::Connect() {
 			Print("Client " + IntStr(user_id) + " Unexpected error");
 			break;
 		}
+		
+		s.Clear();
 	}
 	
-	
 	Print("Client " + IntStr(user_id) + " Stopping");
+	stopped = true;
 }
 
 void Client::Call(Stream& out, Stream& in) {
@@ -290,6 +329,7 @@ void Client::Poll() {
 			User& u = users.GetAdd(sender_id);
 			my_channels.FindAdd(ch_name);
 			Channel& ch = channels.GetAdd(ch_name);
+			ch.userlist.FindAdd(sender_id);
 			ch.Post(sender_id, u.name, message);
 			PostCallback(THISBACK(RefreshGui));
 		}
@@ -374,6 +414,19 @@ void Client::Poll() {
 	}
 	
 	lock.Leave();
+}
+
+void Client::ChangeLocation(Pointf coord) {
+	Location l;
+	l.longitude = coord.x;
+	l.latitude = coord.y;
+	l.elevation = 0.0;
+	SendLocation(l);
+	
+	for(int i = 0; i < my_channels.GetCount(); i++) {
+		Channel& ch = channels.GetAdd(my_channels[i]);
+		ch.Post(-1, "Server", Format("I changed location to %f %f %f", l.longitude, l.latitude, l.elevation));
+	}
 }
 
 void Client::SendLocation(const Location& l) {
@@ -551,6 +604,12 @@ void Client::Command(String cmd) {
 			String ch_name = args[1];
 			Join(ch_name);
 			irc.SetActiveChannel(ch_name);
+			try {
+				RefreshUserlist();
+			}
+			catch (Exc e) {
+			
+			}
 			RefreshGuiChannel();
 		}
 		else if (key == "leave") {
@@ -591,6 +650,7 @@ void Client::Command(String cmd) {
 			User& u = users.GetAdd(recv_id);
 			my_channels.FindAdd(ch_name);
 			Channel& ch = channels.GetAdd(ch_name);
+			ch.userlist.FindAdd(recv_id);
 			ch.Post(user_id, user_name, message);
 			try {
 				Message(recv_id, message);
@@ -745,5 +805,215 @@ void IrcCtrl::SetUserCount(int i) {
 
 void IrcCtrl::SetUser(int i, String s) {
 	users.Set(i, 0, s);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+StartupDialog::StartupDialog(Client& c) : cl(c) {
+	CtrlLayout(*this, "F2F startup");
+	
+	LoadThis();
+	
+	image.SetImage(profile_image);
+	nick.SetData(name);
+	addr.SetData(srv_addr);
+	port.SetData(srv_port);
+	auto_connect.Set(autoconnect);
+	
+	selectserver <<= THISBACK(SelectServer);
+	selectimage <<= THISBACK(SelectImage);
+	
+	nick.SetFocus();
+	Enable(true);
+}
+
+void StartupDialog::Enable(bool b) {
+	nick.Enable(b);
+	addr.Enable(b);
+	port.Enable(b);
+	auto_connect.Enable(b);
+	selectimage.Enable(b);
+	selectserver.Enable(b);
+	connect.Enable(b);
+	if (b) {
+		connect.WhenAction = THISBACK(StartTryConnect);
+		connect.SetLabel(t_("Connect"));
+	} else {
+		connect.WhenAction = THISBACK(StartStopConnect);
+		connect.SetLabel(t_("Stop"));
+	}
+}
+
+void StartupDialog::TryConnect() {
+	name = nick.GetData();
+	autoconnect = auto_connect.Get();
+	srv_addr = addr.GetData();
+	srv_port = port.GetData();
+	StoreThis();
+	
+	if (profile_image.GetSize() == Size(0,0))
+		PostCallback(THISBACK1(SetError, "Profile image is not set"));
+	else if (name.IsEmpty())
+		PostCallback(THISBACK1(SetError, "Profile name is empty"));
+	else if (srv_addr.IsEmpty())
+		PostCallback(THISBACK1(SetError, "Server address is empty"));
+	else if (Connect())
+		PostCallback(THISBACK(Close0));
+	else
+		PostCallback(THISBACK1(SetError, "Connecting server failed"));
+	PostCallback(THISBACK1(Enable, true));
+}
+
+bool StartupDialog::Connect() {
+	cl.SetAddress(srv_addr, srv_port);
+	return cl.Connect() && cl.RegisterScript() && cl.LoginScript();
+}
+
+void StartupDialog::StopConnect() {
+	cl.CloseConnection();
+}
+
+void StartupDialog::SelectServer() {
+	ServerDialog sd(*this);
+	if (sd.Run() == IDOK) {
+		int i = sd.serverlist.GetCursor();
+		if (i >= 0 && i < sd.servers.GetCount()) {
+			addr.SetData(sd.servers[i].addr);
+			port.SetData(sd.servers[i].port);
+			StoreThis();
+		}
+	}
+}
+
+void StartupDialog::SelectImage() {
+	PreviewImage img;
+	FileSel fs;
+	
+	fs.Type("Image file(s)", "*.jpg *.gif *.png *.bmp");
+	fs.Preview(img);
+	
+	if (fs.ExecuteOpen() == IDOK) {
+		String path = ~fs;
+		profile_image = StreamRaster::LoadFileAny(path);
+		image.SetImage(profile_image);
+		StoreThis();
+	}
+}
+
+
+
+
+
+
+ServerDialog::ServerDialog(StartupDialog& sd) : sd(sd) {
+	CtrlLayoutOKCancel(*this, "Select server");
+	
+	serverlist.AddColumn("Title");
+	serverlist.AddColumn("Ping");
+	serverlist.AddColumn("Users");
+	serverlist.AddColumn("Address");
+	serverlist.AddColumn("Port");
+	serverlist.ColumnWidths("6 1 2 3 1");
+	
+	Thread::Start(THISBACK(RefreshAddresses));
+}
+
+void ServerDialog::RefreshAddresses() {
+	Print("Getting server list from the master server");
+	
+	servers.Clear();
+	
+	try {
+		TcpSocket master;
+		if (!master.Connect((String)Config::master_addr, Config::master_port))
+			throw Exc("Unable to connect the master server list");
+		uint16 port = 0;
+		int r = master.Put(&port, sizeof(uint16));
+		if (r != sizeof(uint16)) throw Exc("Master server connection failed");
+		
+		int server_count;
+		r = master.Get(&server_count, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Master server connection failed");
+		
+		for(int i = 0; i < server_count; i++) {
+			Server& s = servers.Add();
+			
+			int addr_len = 0;
+			r = master.Get(&addr_len, sizeof(int));
+			if (r != sizeof(int) || addr_len < 0 || addr_len > 200) throw Exc("Master server connection failed");
+			
+			s.addr = master.Get(addr_len);
+			if (s.addr.GetCount() != addr_len) throw Exc("Master server connection failed");
+			
+			r = master.Get(&s.port, sizeof(uint16));
+			if (r != sizeof(uint16)) throw Exc("Master server connection failed");
+			
+		}
+	}
+	catch (Exc e) {
+		
+		return;
+	}
+	
+	
+	for(int i = 0; i < servers.GetCount(); i++)
+		Thread::Start(THISBACK1(TestConnection, i));
+}
+
+void ServerDialog::TestConnection(int i) {
+	const Server& s = servers[i];
+	
+	{
+		GuiLock _;
+		serverlist.Set(i, 3, s.addr);
+		serverlist.Set(i, 4, s.port);
+	}
+	
+	try {
+		TcpSocket sock;
+		
+		if (!sock.Connect(s.addr, s.port))
+			throw Exc("Couldn't connect " + s.addr + ":" + IntStr(s.port));
+		
+		TimeStop ts;
+		
+		int r, datalen = 0;
+		r = sock.Put(&datalen, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		
+		int greet_len;
+		r = sock.Get(&greet_len, sizeof(int));
+		if (r != sizeof(int) || greet_len < 0 || greet_len > 1000) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		
+		String greeting = sock.Get(greet_len);
+		
+		int sessions;
+		r = sock.Get(&sessions, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		
+		int max_sessions;
+		r = sock.Get(&max_sessions, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		
+		GuiLock _;
+		serverlist.Set(i, 0, greeting);
+		serverlist.Set(i, 1, IntStr(ts.Elapsed()));
+		serverlist.Set(i, 2, IntStr(sessions) + "/" + IntStr(max_sessions));
+	}
+	catch (Exc e) {
+		Print(e);
+		
+	}
 }
 
