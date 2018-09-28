@@ -19,6 +19,7 @@ GUI_APP_MAIN {
 	}
 	
 	if (c.IsConnected()) {
+		startup.Setup();
 		c.Start();
 		c.Run();
 	}

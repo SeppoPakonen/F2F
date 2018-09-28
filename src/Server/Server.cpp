@@ -1,6 +1,17 @@
 #include "Server.h"
 #include "AES.h"
 
+namespace Config {
+
+INI_STRING(server_title, "Unnamed server", "Server name");
+INI_INT(port, 17000, "Server port");
+INI_INT(max_sessions, 10000, "Max clients");
+INI_INT(max_image_size, 100000, "Max profile image size in bytes");
+INI_INT(max_set_string_len, 1000000, "Max set function string size in bytes");
+INI_STRING(master_addr, "93.170.105.68", "Master server's address");
+INI_INT(master_port, 17123, "Master server's port");
+
+};
 
 String RandomPassword(int length) {
 	String s;
@@ -32,45 +43,75 @@ void Server::Init() {
 }
 
 void Server::Listen() {
-	
-	if(!listener.Listen(17000, 5)) {
-		Print("Unable to initialize server socket!");
-		SetExitCode(1);
-		return;
-	}
-	Print("Waiting for requests..");
-	TimeStop ts;
-	while (!Thread::IsShutdownThreads()) {
-		One<ActiveSession> ses;
-		ses.Create();
-		ses->server = this;
-		if(ses->s.Accept(listener)) {
-			ses->s.Timeout(30000);
-			
-			// Close blacklisted connections
-			if (blacklist.Find(ses->s.GetPeerAddr()) != -1)
-				ses->s.Close();
-			else {
-				int id = session_counter++;
-				ses->sess_id = id;
-				
-				lock.EnterWrite();
-				sessions.Add(id, ses.Detach()).Start();
-				lock.LeaveWrite();
-			}
+	try {
+		if(!listener.Listen(Config::port, 5)) {
+			throw Exc("Unable to initialize server socket!");
+			SetExitCode(1);
+			return;
 		}
 		
-		if (ts.Elapsed() > 60*1000) {
-			lock.EnterWrite();
-			for(int i = 0; i < sessions.GetCount(); i++) {
-				if (!sessions[i].s.IsOpen()) {
-					sessions.Remove(i);
-					i--;
+		Print("Registering server to the master server list");
+		TcpSocket master;
+		if (!master.Connect((String)Config::master_addr, Config::master_port))
+			throw Exc("Unable to connect the master server list");
+		uint16 port = Config::port;
+		int r = master.Put(&port, sizeof(uint16));
+		if (r != sizeof(uint16)) throw Exc("Master server connection failed");
+		
+		TcpSocket verify;
+		verify.Timeout(10000);
+		if (!verify.Accept(listener)) throw Exc("Master server couldn't connect this server");
+		int chk;
+		r = verify.Get(&chk, sizeof(int));
+		if (r != sizeof(int) || chk != 12345678) throw Exc("Master server couldn't connect this server");
+		r = verify.Put(&chk, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Master server couldn't connect this server");
+		
+		int ret;
+		r = master.Get(&ret, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Master server connection failed");
+		if (ret != 0) throw Exc("Master server couldn't connect this server");
+		master.Close();
+		
+		
+		Print("Waiting for requests..");
+		TimeStop ts;
+		while (!Thread::IsShutdownThreads()) {
+			One<ActiveSession> ses;
+			ses.Create();
+			ses->server = this;
+			if(ses->s.Accept(listener)) {
+				ses->s.Timeout(30000);
+				
+				// Close blacklisted connections
+				if (blacklist.Find(ses->s.GetPeerAddr()) != -1)
+					ses->s.Close();
+				else {
+					int id = session_counter++;
+					ses->sess_id = id;
+					
+					lock.EnterWrite();
+					sessions.Add(id, ses.Detach()).Start();
+					lock.LeaveWrite();
 				}
 			}
-			lock.LeaveWrite();
-			ts.Reset();
+			
+			if (ts.Elapsed() > 60*1000) {
+				lock.EnterWrite();
+				for(int i = 0; i < sessions.GetCount(); i++) {
+					if (!sessions[i].s.IsOpen()) {
+						sessions.Remove(i);
+						i--;
+					}
+				}
+				lock.LeaveWrite();
+				ts.Reset();
+			}
 		}
+	}
+	catch (Exc e) {
+		Print(e);
+		SetExitCode(1);
 	}
 }
 
@@ -194,6 +235,7 @@ void ActiveSession::GetUserlist(Index<int>& userlist) {
 
 void ActiveSession::Run() {
 	Print("Session " + IntStr(sess_id) + " started handling socket from " + s.GetPeerAddr());
+	int count = 0;
 	try {
 		
 		while (s.IsOpen()) {
@@ -201,6 +243,25 @@ void ActiveSession::Run() {
 			int in_size;
 			r = s.Get(&in_size, sizeof(in_size));
 			if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) throw Exc("Received invalid size");
+			
+			// Greeting
+			if (in_size == 0) {
+				String title = Config::server_title;
+				int i = title.GetCount();
+				s.Put(&i, sizeof(int));
+				s.Put(title.Begin(), title.GetCount());
+				i = server->sessions.GetCount();
+				s.Put(&i, sizeof(int));
+				i = Config::max_sessions;
+				s.Put(&i, sizeof(int));
+				s.Close();
+				break;
+			}
+			// Limit amount of sessions
+			else if (count == 0 && server->sessions.GetCount() >= Config::max_sessions) {
+				s.Close();
+				break;
+			}
 			
 			String in_data = s.Get(in_size);
 			if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
@@ -246,6 +307,8 @@ void ActiveSession::Run() {
 			if (r != sizeof(out_size)) throw Exc("Data sending failed");
 			r = s.Put(out_data.Begin(), out_data.GetCount());
 			if (r != out_data.GetCount()) throw Exc("Data sending failed");
+			
+			count++;
 		}
 	}
 	catch (Exc e) {
@@ -268,7 +331,7 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 	server->lock.EnterWrite();
 	
 	int id = server->db.GetUserCount();
-	String nick = "User" + IntStr(id);
+	String name = "User" + IntStr(id);
 	
 	String pass = RandomPassword(8);
 	int64 passhash = pass.GetHashValue();
@@ -280,14 +343,14 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 		//throw Exc("System error");
 		Panic("System error");
 	}
-	server->db.AddUser(id, nick);
+	server->db.AddUser(id, name);
 	
 	if (db.Init(id)) {
 		server->lock.LeaveWrite();
 		throw Exc("DataBase init failed");
 	}
 	
-	db.nick = nick;
+	db.name = name;
 	db.passhash = passhash;
 	db.joined = now;
 	db.lastlogin = Time(1970,1,1);
@@ -331,7 +394,7 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 	server->user_session_ids.GetAdd(user_id, sess_id) = sess_id;
 	server->lock.LeaveWrite();
 	
-	name = db.nick;
+	name = db.name;
 	
 	db.logins++;
 	db.Flush();
@@ -391,7 +454,7 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 	int value_len;
 	String value;
 	r = in.Get(&value_len, sizeof(value_len));
-	if (r != sizeof(value_len) || value_len < 0 || value_len > 10000) throw Exc("Invalid value argument");
+	if (r != sizeof(value_len) || value_len < 0 || value_len > Config::max_set_string_len) throw Exc("Invalid value argument");
 	value = in.Get(value_len);
 	if (value.GetCount() != value_len) throw Exc("Invalid value received");
 	
@@ -399,7 +462,7 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 	if (key == "name") {
 		server->db.SetUser(user_id, value);
 		server->db.Flush();
-		db.nick = value;
+		db.name = value;
 		db.Flush();
 		name = value;
 
@@ -410,7 +473,11 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		server->SendMessage(user_id, "name " + IntStr(user_id) + " " + value, userlist);
 		server->lock.LeaveRead();
 	}
-	
+	else if (key == "profile_image") {
+		if (value.GetCount() > Config::max_image_size) throw Exc("Invalid image received");
+		db.profile_img = value;
+		db.Flush();
+	}
 	out.Put32(ret);
 }
 
@@ -474,6 +541,10 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 		}
 		
 		server->lock.LeaveRead();
+	}
+	else if (key == "profile_image_hash") {
+		UserDatabase& db = GetDatabase(user_id);
+		out.Put32(db.profile_img.GetHashValue());
 	}
 	
 	out.Seek(size_pos);
@@ -654,6 +725,8 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 
 
 CONSOLE_APP_MAIN {
+	SetIniFile(ConfigFile("Server.ini"));
+	
 	try {
 		Server s;
 		s.Init();

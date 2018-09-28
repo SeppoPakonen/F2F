@@ -43,14 +43,14 @@ public:
 	
 	// Persistent
 	Index<String> channels;
-	String nick;
+	String name, profile_img;
 	int64 passhash = 0;
 	Time joined, lastlogin;
 	int64 logins = 0, onlinetotal = 0, visibletotal = 0;
 	double longitude = 0, latitude = 0, elevation = 0;
 	Time lastupdate;
 	
-	void Serialize(Stream& s) {s % nick % channels % passhash % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate;}
+	void Serialize(Stream& s) {s % name % profile_img % channels % passhash % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate;}
 	void Flush();
 	void SetLocation(double longitude, double latitude, double elevation);
 };

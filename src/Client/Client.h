@@ -88,18 +88,22 @@ public:
 
 class Client : public TopWindow {
 	
+	// Persistent
+	int user_id = -1;
+	String pass;
+	bool is_registered = false;
+	
 	// Session
 	ArrayMap<String, Channel> channels;
 	ArrayMap<int, User> users;
 	Index<String> my_channels;
-	String user_name, pass;
+	String user_name;
 	String addr = "127.0.0.1";
 	One<TcpSocket> s;
-	int user_id = -1;
 	int port = 17000;
-	bool is_registered = false, is_logged_in = false;
+	bool is_logged_in = false;
 	bool running = false, stopped = true;
-	Mutex lock;
+	Mutex call_lock, lock;
 	
 	
 	Splitter split;
@@ -111,6 +115,10 @@ public:
 	Client();
 	~Client();
 	
+	void Serialize(Stream& s) {s % user_id % pass % is_registered;}
+	void StoreThis() {StoreToFile(*this, ConfigFile("Client" + IntStr64(GetServerHash()) + ".bin"));}
+	void LoadThis() {LoadFromFile(*this, ConfigFile("Client" + IntStr64(GetServerHash()) + ".bin"));}
+	unsigned GetServerHash() {CombineHash h; h << addr << port; return h;}
 	
 	bool Connect();
 	void CloseConnection() {if (!s.IsEmpty()) s->Close();}
@@ -120,6 +128,8 @@ public:
 	void Start() {if (!stopped) return; stopped = false; running = true; Thread::Start(THISBACK(HandleConnection));}
 	void Call(Stream& out, Stream& in);
 	void SetAddress(String a, int p) {addr = a; port = p;}
+	void SetName(String s);
+	void SetImage(Image i);
 	
 	void Register();
 	void Login();
@@ -179,6 +189,7 @@ public:
 	bool Connect();
 	void SelectServer();
 	void SelectImage();
+	void Setup();
 	
 	bool IsAutoConnect() const {return autoconnect;}
 	

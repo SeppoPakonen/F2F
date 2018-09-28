@@ -1,5 +1,6 @@
 #include "Client.h"
 #include "AES.h"
+#include <plugin/jpg/jpg.h>
 
 namespace Config {
 
@@ -61,6 +62,7 @@ bool Client::RegisterScript() {
 		try {
 			Register();
 			is_registered = true;
+			StoreThis();
 		}
 		catch (Exc e) {
 			return false;
@@ -85,6 +87,49 @@ bool Client::LoginScript() {
 	return true;
 }
 
+void Client::SetName(String s) {
+	if (user_name == s) return;
+	try {
+		if (Set("name", s))
+			user_name = s;
+	}
+	catch (Exc e) {
+		Print("Changing name failed");
+	}
+}
+
+void Client::SetImage(Image i) {
+	unsigned hash = 0;
+	try {
+		String hash_str;
+		Get("profile_image_hash", hash_str);
+		hash = ScanInt64(hash_str);
+	}
+	catch (Exc e) {
+		Print("Getting existing image hash failed");
+	}
+	while (true) {
+		JPGEncoder jpg;
+		jpg.Quality(80);
+		String imgstr = jpg.SaveString(i);
+		
+		if (imgstr.GetCount() > 100000) {
+			i = RescaleFilter(i, i.GetSize() * 0.5, FILTER_BILINEAR);
+		}
+		else {
+			if (hash != imgstr.GetHashValue()) {
+				try {
+					Set("profile_image", imgstr);
+				}
+				catch (Exc e) {
+					Print("Changing profile image failed");
+				}
+			}
+			break;
+		}
+	}
+}
+	
 void Client::HandleConnection() {
 	Print("Client " + IntStr(user_id) + " Running");
 	
@@ -96,7 +141,6 @@ void Client::HandleConnection() {
 		
 		try {
 			while (!Thread::IsShutdownThreads() && s->IsOpen() && running) {
-				
 				RegisterScript();
 				LoginScript();
 				
@@ -137,18 +181,20 @@ void Client::Call(Stream& out, Stream& in) {
 	String out_data = enc.GetEncryptedData();
 	int out_size = out_data.GetCount();
 	
+	call_lock.Enter();
 	r = s->Put(&out_size, sizeof(out_size));
-	if (r != sizeof(out_size)) throw Exc("Data sending failed");
+	if (r != sizeof(out_size)) {call_lock.Leave(); throw Exc("Data sending failed");}
 	r = s->Put(out_data.Begin(), out_data.GetCount());
-	if (r != out_data.GetCount()) throw Exc("Data sending failed");
+	if (r != out_data.GetCount()) {call_lock.Leave(); throw Exc("Data sending failed");}
 	
 	s->Timeout(30000);
 	int in_size;
 	r = s->Get(&in_size, sizeof(in_size));
-	if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) throw Exc("Received invalid size");
+	if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) {call_lock.Leave(); throw Exc("Received invalid size");}
 	
 	String in_data = s->Get(in_size);
-	if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
+	if (in_data.GetCount() != in_size) {call_lock.Leave(); throw Exc("Received invalid data");}
+	call_lock.Leave();
 	
 	AESDecoderStream dec("passw0rdpassw0rd");
 	dec.AddData(in_data);
@@ -204,12 +250,12 @@ bool Client::Set(const String& key, const String& value) {
 	int ret = in.Get32();
 	if (ret == 1) {
 		Print("Client " + IntStr(user_id) + " set " + key + " = " + value + " FAILED");
-		return 1;
+		return false;
 	}
 	else if (ret != 0) throw Exc("Setting value failed");
 	
 	Print("Client " + IntStr(user_id) + " set " + key + " = " + value);
-	return 0;
+	return true;
 }
 
 void Client::Get(const String& key, String& value) {
@@ -627,7 +673,7 @@ void Client::Command(String cmd) {
 		else if (key == "name") {
 			if (args.GetCount() < 2) return;
 			String name = args[1];
-			if (!Set("name", name)) {
+			if (Set("name", name)) {
 				user_name = name;
 				RefreshGui();
 			}
@@ -877,6 +923,7 @@ void StartupDialog::TryConnect() {
 
 bool StartupDialog::Connect() {
 	cl.SetAddress(srv_addr, srv_port);
+	cl.LoadThis();
 	return cl.Connect() && cl.RegisterScript() && cl.LoginScript();
 }
 
@@ -910,6 +957,18 @@ void StartupDialog::SelectImage() {
 		StoreThis();
 	}
 }
+
+void StartupDialog::Setup() {
+	
+	cl.SetName(name);
+	cl.SetImage(profile_image);
+	
+}
+
+
+
+
+
 
 
 
