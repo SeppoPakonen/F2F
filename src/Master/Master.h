@@ -10,13 +10,15 @@ struct Server : Moveable<Server> {
 	String addr;
 	uint16 port;
 	
+	unsigned GetHashValue() const {CombineHash h; h << addr << port; return h;}
+	bool operator==(const Server& s) const {return s.addr == addr && s.port == port;}
 	void Serialize(Stream& s) {s % addr % port;}
 };
 
 class Master {
 	
 	// Persistent
-	Vector<Server> servers;
+	Index<Server> servers;
 	
 	// Temporary
 	TcpSocket listener;

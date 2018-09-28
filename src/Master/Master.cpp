@@ -46,8 +46,8 @@ void Master::Session(One<TcpSocket> t) {
 			t->Put(&i, sizeof(int));
 			for(int i = 0; i < servers.GetCount(); i++) {
 				const Server& s = servers[i];
-				i = s.addr.GetCount();
-				t->Put(&i, sizeof(int));
+				int size = s.addr.GetCount();
+				t->Put(&size, sizeof(int));
 				t->Put(s.addr.Begin(), s.addr.GetCount());
 				t->Put(&s.port, sizeof(uint16));
 			}
@@ -67,9 +67,10 @@ void Master::Session(One<TcpSocket> t) {
 					if (r == sizeof(int) && chk2 == chk1) {
 						Print("Connected to " + t->GetPeerAddr() + ":" + IntStr(port));
 						lock.EnterWrite();
-						Server& s = servers.Add();
+						Server s;
 						s.addr = t->GetPeerAddr();
 						s.port = port;
+						servers.FindAdd(s);
 						StoreThis();
 						lock.LeaveWrite();
 						i = 0;
