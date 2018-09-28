@@ -29,6 +29,8 @@ struct User : Moveable<User> {
 	// Detailed information
 	Index<String> channels;
 	double longitude = 0, latitude = 0, elevation = 0;
+	unsigned profile_image_hash = 0;
+	Image profile_image;
 };
 
 struct ChannelMessage : Moveable<ChannelMessage> {
@@ -96,6 +98,7 @@ class Client : public TopWindow {
 	// Session
 	ArrayMap<String, Channel> channels;
 	ArrayMap<int, User> users;
+	ArrayMap<unsigned, Image> image_cache;
 	Index<String> my_channels;
 	String user_name;
 	String addr = "127.0.0.1";
@@ -130,6 +133,9 @@ public:
 	void SetAddress(String a, int p) {addr = a; port = p;}
 	void SetName(String s);
 	void SetImage(Image i);
+	void StoreImageCache(const String& image_str);
+	bool HasCachedImage(unsigned hash);
+	String LoadImageCache(unsigned hash);
 	
 	void Register();
 	void Login();

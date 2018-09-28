@@ -1,8 +1,8 @@
 #ifndef _StressTest_StressTest_h
 #define _StressTest_StressTest_h
 
-#include <Core/Core.h>
-
+#include <Draw/Draw.h>
+#include <plugin/jpg/jpg.h>
 using namespace Upp;
 
 struct Location {
@@ -19,6 +19,7 @@ struct User : Moveable<User> {
 	// Detailed information
 	Index<String> channels;
 	double longitude = 0, latitude = 0, elevation = 0;
+	unsigned profile_img_hash;
 };
 
 class Client {
@@ -63,6 +64,7 @@ public:
 	void Poll();
 	void ChannelMessage(String channel, const String& msg);
 	void RefreshUserlist();
+	String RandomImage();
 	
 	Event<int, String> WhenMessage;
 	

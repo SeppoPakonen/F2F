@@ -115,6 +115,14 @@ void Server::Listen() {
 	}
 }
 
+void Server::SendToAll(ActiveSession& user, String msg) {
+	lock.EnterWrite();
+	Index<int> users;
+	user.GetUserlist(users);
+	SendMessage(user.user_id, msg, users);
+	lock.LeaveWrite();
+}
+
 void Server::JoinChannel(const String& channel, ActiveSession& user) {
 	if (channel.IsEmpty()) return;
 	lock.EnterWrite();
@@ -129,7 +137,7 @@ void Server::JoinChannel(const String& channel, ActiveSession& user) {
 		id = channel_ids[i];
 	}
 	Channel& ch = channels.Get(id);
-	SendMessage(user.user_id, "join " + user.name + " " + IntStr(user.user_id) + " " + channel, ch.users);
+	SendMessage(user.user_id, "join " + IntStr(user.user_id) + " " + channel, ch.users);
 	ch.users.FindAdd(user.user_id);
 	user.channels.Add(id);
 	lock.LeaveWrite();
@@ -141,7 +149,7 @@ void Server::LeaveChannel(const String& channel, ActiveSession& user) {
 	Channel& ch = channels.Get(id);
 	ch.users.RemoveKey(user.user_id);
 	user.channels.RemoveKey(id);
-	SendMessage(user.user_id, "leave " + user.name + " " + IntStr(user.user_id) + " " + channel, ch.users);
+	SendMessage(user.user_id, "leave " + IntStr(user.user_id) + " " + channel, ch.users);
 	lock.LeaveWrite();
 }
 
@@ -242,7 +250,7 @@ void ActiveSession::Run() {
 			int r;
 			int in_size;
 			r = s.Get(&in_size, sizeof(in_size));
-			if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) throw Exc("Received invalid size");
+			if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) throw Exc("Received invalid size");
 			
 			// Greeting
 			if (in_size == 0) {
@@ -294,7 +302,7 @@ void ActiveSession::Run() {
 					throw Exc("Received invalid code " + IntStr(code));
 			}
 			
-			AESEncoderStream enc(10000, "passw0rdpassw0rd");
+			AESEncoderStream enc(10000000, "passw0rdpassw0rd");
 			out.Seek(0);
 			String out_str = out.Get(out.GetSize());
 			if (out_str.GetCount() % AES_BLOCK_SIZE != 0)
@@ -393,9 +401,7 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 	server->lock.EnterWrite();
 	server->user_session_ids.GetAdd(user_id, sess_id) = sess_id;
 	server->lock.LeaveWrite();
-	
-	name = db.name;
-	
+		
 	db.logins++;
 	db.Flush();
 	
@@ -408,8 +414,8 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 	
 	out.Put32(0);
 	
-	out.Put32(name.GetCount());
-	out.Put(name.Begin(), name.GetCount());
+	out.Put32(db.name.GetCount());
+	out.Put(db.name.Begin(), db.name.GetCount());
 }
 
 void ActiveSession::Logout() {
@@ -460,12 +466,13 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 	
 	int ret = 0;
 	if (key == "name") {
+		server->lock.EnterWrite();
 		server->db.SetUser(user_id, value);
 		server->db.Flush();
+		server->lock.LeaveWrite();
 		db.name = value;
 		db.Flush();
-		name = value;
-
+		
 		Index<int> userlist;
 		GetUserlist(userlist);
 		userlist.RemoveKey(user_id);
@@ -476,7 +483,12 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 	else if (key == "profile_image") {
 		if (value.GetCount() > Config::max_image_size) throw Exc("Invalid image received");
 		db.profile_img = value;
+		db.profile_img_hash = value.GetHashValue();
 		db.Flush();
+		
+		StoreImageCache(db.profile_img_hash, db.profile_img);
+		
+		server->SendToAll(*this, "profile " + IntStr(user_id) + " " + value);
 	}
 	out.Put32(ret);
 }
@@ -492,6 +504,13 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	
 	int64 size_pos = out.GetPos();
 	out.SeekCur(sizeof(int));
+	
+	int i = key.Find(" ");
+	Vector<String> args;
+	if (i != -1) {
+		args = Split(key.Mid(i+1), " ");
+		key = key.Left(i);
+	}
 	
 	if (key == "channellist") {
 		server->lock.EnterRead();
@@ -522,12 +541,13 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 			}
 			j = server->user_session_ids[j];
 			const ActiveSession& as = server->sessions.Get(j);
-			out.Put32(as.user_id);
-			out.Put32(as.name.GetCount());
-			if (!as.name.IsEmpty())
-				out.Put(as.name.Begin(), as.name.GetCount());
-			
 			const UserDatabase& db = GetDatabase(as.user_id);
+			out.Put32(as.user_id);
+			out.Put32(db.name.GetCount());
+			if (!db.name.IsEmpty())
+				out.Put(db.name.Begin(), db.name.GetCount());
+			
+			out.Put32(db.profile_img_hash);
 			out.Put(&db.longitude, sizeof(double));
 			out.Put(&db.latitude, sizeof(double));
 			out.Put(&db.elevation, sizeof(double));
@@ -544,7 +564,20 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	}
 	else if (key == "profile_image_hash") {
 		UserDatabase& db = GetDatabase(user_id);
-		out.Put32(db.profile_img.GetHashValue());
+		out.Put32(db.profile_img_hash);
+	}
+	else if (key == "image" && args.GetCount() == 1) {
+		String img_folder = ConfigFile("images");
+		RealizeDirectory(img_folder);
+		String img_file = AppendFileName(img_folder, args[0] + ".bin");
+		if (FileExists(img_file)) {
+			String image_str = LoadFile(img_file);
+			out.Put32(image_str.GetCount());
+			out.Put(image_str.Begin(), image_str.GetCount());
+		}
+		else {
+			out.Put32(0);
+		}
 	}
 	
 	out.Seek(size_pos);
@@ -623,7 +656,7 @@ void ActiveSession::Message(Stream& in, Stream& out) {
 	r = in.Get(&recv_user_id, sizeof(recv_user_id));
 	if (r != sizeof(recv_user_id)) throw Exc("Invalid message argument");
 	r = in.Get(&recv_msg_len, sizeof(recv_msg_len));
-	if (r != sizeof(recv_msg_len) || recv_msg_len < 0 || recv_msg_len > 10000) throw Exc("Invalid message argument");
+	if (r != sizeof(recv_msg_len) || recv_msg_len < 0 || recv_msg_len > 10000000) throw Exc("Invalid message argument");
 	recv_msg = in.Get(recv_msg_len);
 	if (recv_msg.GetCount() != recv_msg_len) throw Exc("Invalid message received");
 	
@@ -687,7 +720,7 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 	recv_ch = in.Get(recv_ch_len);
 	if (recv_ch.GetCount() != recv_ch_len) throw Exc("Invalid message argument");
 	r = in.Get(&recv_msg_len, sizeof(recv_msg_len));
-	if (r != sizeof(recv_msg_len) || recv_msg_len < 0 || recv_msg_len > 10000) throw Exc("Invalid message argument");
+	if (r != sizeof(recv_msg_len) || recv_msg_len < 0 || recv_msg_len > 10000000) throw Exc("Invalid message argument");
 	recv_msg = in.Get(recv_msg_len);
 	if (recv_msg.GetCount() != recv_msg_len) throw Exc("Invalid message received");
 	
@@ -698,7 +731,6 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 	i = server->channels.Find(recv_sess_id);
 	if (i < 0)  {server->lock.LeaveRead(); throw Exc("System error");}
 	Channel& ch = server->channels[i];
-	server->lock.LeaveRead();
 	
 	const MessageRef& ref = server->IncReference("chmsg " + recv_ch + " " + recv_msg, ch.users.GetCount() - 1);
 	
@@ -717,8 +749,18 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 		msg.sender_id = user_id;
 	}
 	lock.Leave();
+	server->lock.LeaveRead();
 	
 	out.Put32(0);
+}
+
+void ActiveSession::StoreImageCache(unsigned hash, const String& image_str) {
+	String img_folder = ConfigFile("images");
+	RealizeDirectory(img_folder);
+	String img_file = AppendFileName(img_folder, IntStr64(hash) + ".bin");
+	FileOut fout(img_file);
+	fout << image_str;
+	fout.Close();
 }
 
 

@@ -61,6 +61,7 @@ void Client::Run() {
 					case 100:		Register(); registered = true; break;
 					case 200:		Login();
 									RefreshUserlist();
+									Set("profile_image", RandomImage());
 									logged_in = true;
 									break;
 					case 301:		Set("name", RandomName()); break;
@@ -97,7 +98,7 @@ void Client::Run() {
 void Client::Call(Stream& out, Stream& in) {
 	int r;
 	
-	AESEncoderStream enc(10000, "passw0rdpassw0rd");
+	AESEncoderStream enc(10000000, "passw0rdpassw0rd");
 	out.Seek(0);
 	String out_str = out.Get(out.GetSize());
 	if (out_str.GetCount() % AES_BLOCK_SIZE != 0)
@@ -114,7 +115,7 @@ void Client::Call(Stream& out, Stream& in) {
 	s->Timeout(30000);
 	int in_size;
 	r = s->Get(&in_size, sizeof(in_size));
-	if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) throw Exc("Received invalid size");
+	if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) throw Exc("Received invalid size");
 	
 	String in_data = s->Get(in_size);
 	if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
@@ -172,12 +173,12 @@ bool Client::Set(const String& key, const String& value) {
 	
 	int ret = in.Get32();
 	if (ret == 1) {
-		Print("Client " + IntStr(id) + " set " + key + " = " + value + " FAILED");
+		//Print("Client " + IntStr(id) + " set " + key + " = " + value + " FAILED");
 		return 1;
 	}
 	else if (ret != 0) throw Exc("Setting value failed");
 	
-	Print("Client " + IntStr(id) + " set " + key + " = " + value);
+	//Print("Client " + IntStr(id) + " set " + key + " = " + value);
 	return 0;
 }
 
@@ -279,8 +280,10 @@ void Client::Poll() {
 		String message;
 		if (msg_len > 0)
 			message = in.Get(msg_len);
-		if (message.GetCount() != msg_len) throw Exc("Polling failed");
-		Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + message);
+		int recv_len = message.GetCount();
+		bool is_eof = in.IsEof();
+		if (recv_len != msg_len) throw Exc("Polling failed");
+		Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + IntStr(message.GetCount()));
 		
 		int j = message.Find(" ");
 		if (j == -1) continue;
@@ -295,29 +298,25 @@ void Client::Poll() {
 		}
 		else if (key == "join") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 3) throw Exc("Polling argument error");
-			String user_name = args[0];
-			int user_id = StrInt(args[1]);
-			String channel = args[2];
+			if (args.GetCount() != 2) throw Exc("Polling argument error");
+			int user_id = StrInt(args[0]);
+			String channel = args[1];
 			if (user_id == this->user_id) // mysterious bug
 				continue;
 			ASSERT(user_id != this->user_id && user_id >= 0);
 			User& u = users.GetAdd(user_id);
-			u.name = user_name;
 			u.user_id = user_id;
 			u.channels.Add(channel);
 		}
 		else if (key == "leave") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 3) throw Exc("Polling argument error");
-			String user_name = args[0];
-			int user_id = StrInt(args[1]);
-			String channel = args[2];
+			if (args.GetCount() != 2) throw Exc("Polling argument error");
+			int user_id = StrInt(args[0]);
+			String channel = args[1];
 			if (user_id == this->user_id) // mysterious bug
 				continue;
 			ASSERT(user_id != this->user_id);
 			User& u = users.GetAdd(user_id);
-			u.name = user_name;
 			u.user_id = user_id;
 			u.channels.RemoveKey(channel);
 			if (u.channels.IsEmpty())
@@ -335,7 +334,13 @@ void Client::Poll() {
 			u.name = user_name;
 			u.user_id = user_id;
 		}
-		
+		else if (key == "profile") {
+			
+		}
+		else if (key == "loc") {
+			
+		}
+		else Panic("Unhandled key: " + key);
 	}
 }
 
@@ -393,6 +398,7 @@ void Client::RefreshUserlist() {
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
+		in.Get(&u.profile_img_hash, sizeof(int));
 		in.Get(&u.longitude, sizeof(double));
 		in.Get(&u.latitude, sizeof(double));
 		in.Get(&u.elevation, sizeof(double));
@@ -408,6 +414,13 @@ void Client::RefreshUserlist() {
 	if (fail) throw Exc("Getting userlist failed");
 	
 	Print("Client " + IntStr(id) + " updated userlist (size " + IntStr(user_count) + ")");
+}
+
+String Client::RandomImage() {
+	ImageBuffer img(128, 128);
+	Fill(img, Size(128, 128), Color(Random(255), Random(255), Random(255)));
+	JPGEncoder jpg;
+	return jpg.SaveString(img);
 }
 
 String Client::RandomName() {

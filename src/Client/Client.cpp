@@ -14,6 +14,7 @@ void Print(const String& s) {
 	lock.Enter();
 	Cout() << s;
 	Cout().PutEol();
+	LOG(s);
 	lock.Leave();
 }
 
@@ -129,7 +130,29 @@ void Client::SetImage(Image i) {
 		}
 	}
 }
-	
+
+void Client::StoreImageCache(const String& image_str) {
+	unsigned hash = image_str.GetHashValue();
+	String img_folder = ConfigFile("images");
+	RealizeDirectory(img_folder);
+	String img_file = AppendFileName(img_folder, IntStr64(hash) + ".bin");
+	FileOut fout(img_file);
+	fout << image_str;
+	fout.Close();
+}
+
+bool Client::HasCachedImage(unsigned hash) {
+	String img_folder = ConfigFile("images");
+	String img_file = AppendFileName(img_folder, IntStr64(hash) + ".bin");
+	return FileExists(img_file);
+}
+
+String Client::LoadImageCache(unsigned hash) {
+	String img_folder = ConfigFile("images");
+	String img_file = AppendFileName(img_folder, IntStr64(hash) + ".bin");
+	return LoadFile(img_file);
+}
+
 void Client::HandleConnection() {
 	Print("Client " + IntStr(user_id) + " Running");
 	
@@ -172,7 +195,7 @@ void Client::HandleConnection() {
 void Client::Call(Stream& out, Stream& in) {
 	int r;
 	
-	AESEncoderStream enc(10000, "passw0rdpassw0rd");
+	AESEncoderStream enc(10000000, "passw0rdpassw0rd");
 	out.Seek(0);
 	String out_str = out.Get(out.GetSize());
 	if (out_str.GetCount() % AES_BLOCK_SIZE != 0)
@@ -190,7 +213,7 @@ void Client::Call(Stream& out, Stream& in) {
 	s->Timeout(30000);
 	int in_size;
 	r = s->Get(&in_size, sizeof(in_size));
-	if (r != sizeof(in_size) || in_size < 0 || in_size >= 100000) {call_lock.Leave(); throw Exc("Received invalid size");}
+	if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) {call_lock.Leave(); throw Exc("Received invalid size");}
 	
 	String in_data = s->Get(in_size);
 	if (in_data.GetCount() != in_size) {call_lock.Leave(); throw Exc("Received invalid data");}
@@ -362,7 +385,7 @@ void Client::Poll() {
 		if (msg_len > 0)
 			message = in.Get(msg_len);
 		if (message.GetCount() != msg_len) {lock.Leave(); throw Exc("Polling failed");}
-		Print("Client " + IntStr(user_id) + " received from " + IntStr(sender_id) + ": " + message);
+		Print("Client " + IntStr(user_id) + " received from " + IntStr(sender_id) + ": " + IntStr(message.GetCount()));
 		
 		int j = message.Find(" ");
 		if (j == -1) continue;
@@ -391,36 +414,32 @@ void Client::Poll() {
 		}
 		else if (key == "join") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 3) {lock.Leave(); throw Exc("Polling argument error");}
-			String user_name = args[0];
-			int user_id = StrInt(args[1]);
+			if (args.GetCount() != 2) {lock.Leave(); throw Exc("Polling argument error");}
+			int user_id = StrInt(args[0]);
 			ASSERT(user_id != this->user_id);
-			String ch_name = args[2];
+			String ch_name = args[1];
 			User& u = users.GetAdd(user_id);
-			u.name = user_name;
 			u.user_id = user_id;
 			u.channels.FindAdd(ch_name);
 			Channel& ch = channels.GetAdd(ch_name);
 			ch.userlist.FindAdd(user_id);
-			ch.Post(-1, "Server", Format("User %s joined channel %s", user_name, ch_name));
+			ch.Post(-1, "Server", Format("User %s joined channel %s", u.name, ch_name));
 			PostCallback(THISBACK(RefreshGui));
 		}
 		else if (key == "leave") {
 			Vector<String> args = Split(message, " ");
-			if (args.GetCount() != 3) {lock.Leave(); throw Exc("Polling argument error");}
-			String user_name = args[0];
-			int user_id = StrInt(args[1]);
+			if (args.GetCount() != 2) {lock.Leave(); throw Exc("Polling argument error");}
+			int user_id = StrInt(args[0]);
 			ASSERT(user_id != this->user_id);
-			String ch_name = args[2];
+			String ch_name = args[1];
 			User& u = users.GetAdd(user_id);
-			u.name = user_name;
 			u.user_id = user_id;
 			u.channels.RemoveKey(ch_name);
-			if (u.channels.IsEmpty())
-				users.RemoveKey(user_id);
 			Channel& ch = channels.GetAdd(ch_name);
 			ch.userlist.RemoveKey(user_id);
-			ch.Post(-1, "Server", Format("User %s left channel %s", user_name, ch_name));
+			ch.Post(-1, "Server", "User " + u.name + " left channel " + ch_name);
+			if (u.channels.IsEmpty())
+				users.RemoveKey(user_id);
 			PostCallback(THISBACK(RefreshGui));
 		}
 		else if (key == "name") {
@@ -455,6 +474,23 @@ void Client::Poll() {
 			for(int i = 0; i < u.channels.GetCount(); i++) {
 				Channel& ch = channels.GetAdd(u.channels[i]);
 				ch.Post(-1, "Server", Format("User %s changed location to %f %f %f", u.name, lon, lat, elev));
+			}
+		}
+		else if (key == "profile") {
+			j = message.Find(" ");
+			if (j == -1) {lock.Leave(); throw Exc("System error");}
+			String user_id_str = message.Left(j);
+			int user_id = ScanInt(user_id_str);
+			message = message.Mid(j+1);
+			j = users.Find(user_id);
+			if (j == -1) {lock.Leave(); throw Exc("User not found");}
+			User& u = users[j];
+			u.profile_image = StreamRaster::LoadStringAny(message);
+			u.profile_image_hash = message.GetHashValue();
+			StoreImageCache(message);
+			for(int i = 0; i < u.channels.GetCount(); i++) {
+				Channel& ch = channels.GetAdd(u.channels[i]);
+				ch.Post(-1, "Server", Format("User %s updated profile image", u.name));
 			}
 		}
 	}
@@ -561,6 +597,8 @@ void Client::RefreshUserlist() {
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
+		
+		u.profile_image_hash = in.Get32();
 		in.Get(&u.longitude, sizeof(double));
 		in.Get(&u.latitude, sizeof(double));
 		in.Get(&u.elevation, sizeof(double));
@@ -576,6 +614,25 @@ void Client::RefreshUserlist() {
 		}
 	}
 	if (fail) throw Exc("Getting userlist failed");
+	
+	for(int i = 0; i < users.GetCount(); i++) {
+		User& u = users[i];
+		String image_str;
+		
+		if (!HasCachedImage(u.profile_image_hash)) {
+			// Fetch image
+			Get("image " + IntStr64(u.profile_image_hash), image_str);
+			
+			// Store to hard drive
+			StoreImageCache(image_str);
+			
+		} else {
+			image_str = LoadImageCache(u.profile_image_hash);
+		}
+		
+		// Load to memory
+		u.profile_image = StreamRaster::LoadStringAny(image_str);
+	}
 	
 	Print("Client " + IntStr(user_id) + " updated userlist (size " + IntStr(user_count) + ")");
 }
@@ -603,9 +660,10 @@ void Client::RefreshGui() {
 		}
 		ch.unread = 0;
 		
-		irc.SetUserCount(ch.userlist.GetCount());
-		map.SetPersonCount(ch.userlist.GetCount());
-		for(int i = 0; i < ch.userlist.GetCount(); i++) {
+		int count = ch.userlist.GetCount();
+		irc.SetUserCount(count);
+		map.SetPersonCount(count);
+		for(int i = 0; i < min(count, ch.userlist.GetCount()); i++) {
 			User& u = users.GetAdd(ch.userlist[i]);
 			irc.SetUser(i, u.name);
 			map.SetPerson(i, Pointf(u.longitude, u.latitude));
@@ -959,10 +1017,8 @@ void StartupDialog::SelectImage() {
 }
 
 void StartupDialog::Setup() {
-	
 	cl.SetName(name);
 	cl.SetImage(profile_image);
-	
 }
 
 
