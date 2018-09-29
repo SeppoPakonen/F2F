@@ -63,6 +63,7 @@ public:
 	void Get(const String& key, String& value);
 	void Poll();
 	void ChannelMessage(String channel, const String& msg);
+	void RefreshChannellist();
 	void RefreshUserlist();
 	String RandomImage();
 	

@@ -66,6 +66,7 @@ void Client::Run() {
 				switch (action) {
 					case 100:		Register(); registered = true; break;
 					case 200:		Login();
+									RefreshChannellist();
 									RefreshUserlist();
 									Set("profile_image", RandomImage());
 									logged_in = true;
@@ -385,6 +386,31 @@ void Client::ChannelMessage(String channel, const String& msg) {
 	Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + channel + ": " + msg);
 }
 
+void Client::RefreshChannellist() {
+	String channellist_str;
+	Get("channellist", channellist_str);
+	MemReadStream in(channellist_str.Begin(), channellist_str.GetCount());
+	
+	Index<String> ch_rem;
+	for(int i = 0; i < joined_channels.GetCount(); i++) ch_rem.Add(joined_channels[i]);
+	
+	int ch_count = in.Get32();
+	bool fail = false;
+	for(int i = 0; i < ch_count; i++) {
+		int name_len = in.Get32();
+		if (name_len <= 0) continue;
+		String name = in.Get(name_len);
+		
+		if (ch_rem.Find(name) != -1) ch_rem.RemoveKey(name);
+		
+		joined_channels.FindAdd(name);
+	}
+	if (fail) throw Exc("Getting channellist failed");
+	
+	for(int i = 0; i < ch_rem.GetCount(); i++)
+		joined_channels.RemoveKey(ch_rem[i]);
+}
+
 void Client::RefreshUserlist() {
 	String userlist_str;
 	Get("userlist", userlist_str);
@@ -437,7 +463,7 @@ String Client::RandomName() {
 }
 
 String Client::RandomNewChannel() {
-	switch (Random(11)) {
+	switch (Random(11 + 1)) {
 		case 0: return "sports";
 		case 1: return "animals";
 		case 2: return "news";
@@ -448,6 +474,7 @@ String Client::RandomNewChannel() {
 		case 7: return "social";
 		case 8: return "alt";
 		case 9: return "travel";
+		case 10: return "testers";
 	}
 	String s;
 	for(int i = 0; i < 8; i++)

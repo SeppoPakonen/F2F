@@ -14,6 +14,7 @@ using namespace Upp;
 
 
 void Print(const String& s);
+double CoordinateDistanceKM(Pointf a, Pointf b);
 
 struct Location {
 	double latitude, longitude, elevation;
@@ -109,9 +110,11 @@ class Client : public TopWindow {
 	Mutex call_lock, lock;
 	
 	
-	Splitter split;
+	Splitter split, rvsplit, rhsplit;
 	IrcCtrl irc;
 	MapDlgDlg map;
+	ArrayCtrl nearestlist;
+	WithDetails<ParentCtrl> details;
 	
 public:
 	typedef Client CLASSNAME;
@@ -155,6 +158,7 @@ public:
 	
 	void RefreshGui();
 	void RefreshGuiChannel();
+	void RefreshNearest();
 	void Command(String cmd);
 	
 	bool IsConnected() {return !s.IsEmpty() && s->IsOpen() && is_logged_in;}

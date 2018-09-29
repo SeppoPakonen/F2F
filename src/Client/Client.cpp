@@ -18,6 +18,24 @@ void Print(const String& s) {
 	lock.Leave();
 }
 
+double DegreesToRadians(double degrees) {
+  return degrees * M_PI / 180.0;
+}
+
+double CoordinateDistanceKM(Pointf a, Pointf b) {
+	double earth_radius_km = 6371.0;
+	
+	double dLat = DegreesToRadians(b.y - a.y);
+	double dLon = DegreesToRadians(b.x - a.x);
+	
+	a.y = DegreesToRadians(a.y);
+	b.y = DegreesToRadians(b.y);
+	
+	double d = sin(dLat/2) * sin(dLat/2) +
+		sin(dLon/2) * sin(dLon/2) * cos(a.y) * cos(b.y);
+	double c = 2 * atan2(sqrt(d), sqrt(1-d));
+	return earth_radius_km * c;
+}
 
 
 Client::Client() {
@@ -26,15 +44,31 @@ Client::Client() {
 	Sizeable().MaximizeBox().MinimizeBox();
 	
 	Add(split.SizePos());
-	split << irc << map;
+	split << irc << rvsplit;
 	split.Horz();
-	split.SetPos(6666);
+	split.SetPos(5555);
+	
+	rvsplit << map << rhsplit;
+	rvsplit.Vert();
+	rvsplit.SetPos(6666);
+	rhsplit << nearestlist << details;
+	rhsplit.Horz();
+	rhsplit.SetPos(2500);
+	
+	CtrlLayout(details);
 	
 	irc.WhenCommand << THISBACK(Command);
 	irc.WhenChannelChanged << THISBACK(RefreshGuiChannel);
 	
 	map.Set(Pointf(25.46748, 65.05919));
 	map.WhenHome << THISBACK(ChangeLocation);
+	
+	nearestlist.AddIndex();
+	nearestlist.AddColumn("Distance (km)");
+	nearestlist.AddColumn("Name");
+	nearestlist <<= THISBACK(RefreshNearest);
+	
+	details.channels.AddColumn("Channel");
 }
 
 Client::~Client() {
@@ -81,6 +115,11 @@ bool Client::RegisterScript() {
 bool Client::LoginScript() {
 	if (!is_logged_in) {
 		try {
+			lock.Enter();
+			users.Clear();
+			channels.Clear();
+			lock.Leave();
+			
 			Login();
 			RefreshChannellist();
 			RefreshUserlist();
@@ -485,6 +524,7 @@ void Client::Poll() {
 				Channel& ch = channels.GetAdd(u.channels[i]);
 				ch.Post(-1, "Server", Format("User %s changed location to %f %f %f", u.name, lon, lat, elev));
 			}
+			PostCallback(THISBACK(RefreshGui));
 		}
 		else if (key == "profile") {
 			j = message.Find(" ");
@@ -503,6 +543,7 @@ void Client::Poll() {
 					ch.Post(-1, "Server", Format("User %s updated profile image", u.name));
 				}
 			}
+			PostCallback(THISBACK(RefreshGui));
 		}
 		
 		key_time.GetAdd(key, 0) += ts.Elapsed();
@@ -546,6 +587,7 @@ void Client::ChangeLocation(Pointf coord) {
 		Channel& ch = channels.GetAdd(my_channels[i]);
 		ch.Post(-1, "Server", Format("I changed location to %f %f %f", l.longitude, l.latitude, l.elevation));
 	}
+	PostCallback(THISBACK(RefreshGui));
 }
 
 void Client::SendLocation(const Location& l) {
@@ -706,14 +748,26 @@ void Client::RefreshGui() {
 		}
 		ch.unread = 0;
 		
+		Pointf my_position = map.Get();
+		
 		int count = ch.userlist.GetCount();
 		irc.SetUserCount(count);
 		map.SetPersonCount(count);
-		for(int i = 0; i < min(count, ch.userlist.GetCount()); i++) {
-			User& u = users.GetAdd(ch.userlist[i]);
+		count = min(count, ch.userlist.GetCount());
+		for(int i = 0; i < count; i++) {
+			int user_id = ch.userlist[i];
+			User& u = users.GetAdd(user_id);
 			irc.SetUser(i, u.profile_image, u.name);
-			map.SetPerson(i, Pointf(u.longitude, u.latitude), u.profile_image);
+			Pointf user_pt(u.longitude, u.latitude);
+			map.SetPerson(i, user_pt, u.profile_image);
+			
+			double distance = CoordinateDistanceKM(my_position, user_pt);
+			nearestlist.Set(i, 0, user_id);
+			nearestlist.Set(i, 1, distance);
+			nearestlist.Set(i, 2, u.name);
 		}
+		nearestlist.SetCount(count);
+		nearestlist.SetSortColumn(0, false);
 	}
 	
 	lock.Leave();
@@ -740,6 +794,18 @@ void Client::RefreshGuiChannel() {
 	}
 	
 	RefreshGui();
+}
+
+void Client::RefreshNearest() {
+	int i = nearestlist.GetCursor();
+	if (i < 0 || i >= nearestlist.GetCount()) return;
+	int user_id = nearestlist.Get(i, 0);
+	User& u = users.GetAdd(user_id);
+	details.profile_img.SetImage(u.profile_image);
+	details.name.SetLabel(u.name);
+	for(int i = 0; i < u.channels.GetCount(); i++) {
+		details.channels.Set(i, 0, u.channels[i]);
+	}
 }
 
 void Client::Command(String cmd) {
@@ -834,8 +900,8 @@ void Client::Command(String cmd) {
 			catch (Exc e) {
 				ch.Post(-1, "F2F client", "Problems sending messages...");
 			}
-			PostCallback(THISBACK(RefreshGui));
 		}
+		PostCallback(THISBACK(RefreshGui));
 	}
 }
 

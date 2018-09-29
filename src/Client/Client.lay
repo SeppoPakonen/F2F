@@ -20,3 +20,15 @@ LAYOUT(SelectServer, 556, 292)
 	ITEM(Button, ok, SetLabel(t_("OK")).RightPosZ(4, 108).BottomPosZ(4, 24))
 END_LAYOUT
 
+LAYOUT(Details, 400, 200)
+	ITEM(ImageCtrl, profile_img, HSizePosZ(252, 4).VSizePosZ(4, 4))
+	ITEM(Label, dv___1, SetLabel(t_("Channels:")).SetFont(StdFont().Bold()).LeftPosZ(4, 84).TopPosZ(76, 20))
+	ITEM(Label, gender, LeftPosZ(92, 156).TopPosZ(52, 20))
+	ITEM(Label, age, LeftPosZ(92, 156).TopPosZ(28, 20))
+	ITEM(Label, name, LeftPosZ(92, 156).TopPosZ(4, 20))
+	ITEM(Label, dv___5, SetLabel(t_("Gender:")).SetFont(StdFont().Bold()).LeftPosZ(4, 84).TopPosZ(52, 20))
+	ITEM(ArrayCtrl, channels, LeftPosZ(92, 154).VSizePosZ(76, 4))
+	ITEM(Label, dv___7, SetLabel(t_("Age:")).SetFont(StdFont().Bold()).LeftPosZ(4, 84).TopPosZ(28, 20))
+	ITEM(Label, dv___8, SetLabel(t_("Name:")).SetFont(StdFont().Bold()).LeftPosZ(4, 84).TopPosZ(4, 20))
+END_LAYOUT
+

@@ -30,6 +30,7 @@ void Print(const String& s) {
 	lock.Enter();
 	Cout() << s;
 	Cout().PutEol();
+	LOG(s);
 	lock.Leave();
 }
 
@@ -52,11 +53,15 @@ void Server::Listen() {
 		
 		Print("Registering server to the master server list");
 		TcpSocket master;
+		master.Timeout(10000);
 		if (!master.Connect((String)Config::master_addr, Config::master_port))
 			throw Exc("Unable to connect the master server list");
+		#ifdef flagPOSIX
+		Sleep(1000); // weird bug occurs in linux without this
+		#endif
 		uint16 port = Config::port;
 		int r = master.Put(&port, sizeof(uint16));
-		if (r != sizeof(uint16)) throw Exc("Master server connection failed");
+		if (r != sizeof(uint16)) throw Exc("Master server connection failed (1)");
 		
 		TcpSocket verify;
 		verify.Timeout(10000);
@@ -688,7 +693,6 @@ void ActiveSession::Poll(Stream& in, Stream& out) {
 	Vector<InboxMessage> tmp;
 	lock.Enter();
 	Swap(inbox, tmp);
-	inbox.SetCount(0);
 	lock.Leave();
 	
 	// double check that sender_id != user_id
@@ -738,7 +742,6 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 	
 	const MessageRef& ref = server->IncReference("chmsg " + recv_ch + " " + recv_msg, ch.users.GetCount() - 1);
 	
-	lock.Enter();
 	for(int i = 0; i < ch.users.GetCount(); i++) {
 		int id = ch.users[i];
 		if (id == user_id) continue;
@@ -748,11 +751,12 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 		j = server->sessions.Find(id);
 		if (j == -1) continue;
 		ActiveSession& recv_as = server->sessions[j];
+		recv_as.lock.Enter();
 		InboxMessage& msg = recv_as.inbox.Add();
 		msg.msg = ref.hash;
 		msg.sender_id = user_id;
+		recv_as.lock.Leave();
 	}
-	lock.Leave();
 	server->lock.LeaveRead();
 	
 	out.Put32(0);
