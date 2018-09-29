@@ -81,7 +81,7 @@ public:
 	String GetActiveChannel() const {return active_channel;}
 	void Post(const ChannelMessage& msg);
 	void SetUserCount(int i);
-	void SetUser(int i, String s);
+	void SetUser(int i, Image img, String s);
 	void SetActiveChannel(String s) {active_channel = s;}
 	
 	Callback1<String> WhenCommand;
@@ -124,7 +124,7 @@ public:
 	unsigned GetServerHash() {CombineHash h; h << addr << port; return h;}
 	
 	bool Connect();
-	void CloseConnection() {if (!s.IsEmpty()) s->Close();}
+	void CloseConnection() {if (!s.IsEmpty()) s->Close(); is_logged_in = false;}
 	bool LoginScript();
 	bool RegisterScript();
 	void HandleConnection();
@@ -149,6 +149,8 @@ public:
 	void Poll();
 	void RefreshChannellist();
 	void RefreshUserlist();
+	void RefreshUserImage(User& u);
+	bool Who(Stream& in);
 	void ChangeLocation(Pointf coord);
 	
 	void RefreshGui();
@@ -169,6 +171,33 @@ class PreviewImage : public ImageCtrl {
 	}
 };
 
+class StartupDialog;
+
+class ServerDialog : public WithSelectServer<TopWindow> {
+	StartupDialog& sd;
+	
+protected:
+	friend class StartupDialog;
+	
+	struct Server : Moveable<Server> {
+		String greeting, addr;
+		uint16 port = 0;
+		int elapsed = 9999, sessions = 0, max_sessions = 0;
+	};
+	Vector<Server> servers;
+	Array<TcpSocket> socks;
+	int running = 0;
+	
+public:
+	typedef ServerDialog CLASSNAME;
+	ServerDialog(StartupDialog& sd);
+	~ServerDialog() {for(auto& s : socks) {s.Timeout(1); s.Close();} while (running > 0) Sleep(100);}
+	
+	void RefreshAddresses();
+	void TestConnection(int i);
+	void Data();
+};
+
 class StartupDialog : public WithStartupDialog<TopWindow> {
 	
 	// Persistent
@@ -180,6 +209,7 @@ class StartupDialog : public WithStartupDialog<TopWindow> {
 	// Temporary
 	Client& cl;
 	bool connecting = false;
+	ServerDialog sd;
 	
 public:
 	typedef StartupDialog CLASSNAME;
@@ -205,26 +235,5 @@ public:
 	
 };
 
-class ServerDialog : public WithSelectServer<TopWindow> {
-	StartupDialog& sd;
-	
-protected:
-	friend class StartupDialog;
-	
-	struct Server : Moveable<Server> {
-		String addr;
-		uint16 port;
-	};
-	Vector<Server> servers;
-	
-	
-public:
-	typedef ServerDialog CLASSNAME;
-	ServerDialog(StartupDialog& sd);
-	
-	void RefreshAddresses();
-	void TestConnection(int i);
-	
-};
 
 #endif

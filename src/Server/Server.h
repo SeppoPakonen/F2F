@@ -130,6 +130,9 @@ public:
 	void Poll(Stream& in, Stream& out);
 	void Get(Stream& in, Stream& out);
 	void Set(Stream& in, Stream& out);
+	
+	void Who(int user_id, Stream& out);
+	
 };
 
 struct MessageRef : Moveable<MessageRef> {

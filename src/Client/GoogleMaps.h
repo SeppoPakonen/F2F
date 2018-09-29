@@ -35,6 +35,7 @@ struct MapImage : public Ctrl {
 	String error;
 	Point  home;
 	Vector<Pointf> persons;
+	Vector<Image> images;
 	
 	Callback1<Point> WhenLeftClick;
 	
@@ -52,8 +53,11 @@ struct MapImage : public Ctrl {
 			w.DrawImage(0, 0, map);
 			for(int i = 0; i < persons.GetCount(); i++) {
 				Pointf person = persons[i];
-				Point p = GoogleMapsImg::Person().GetHotSpot();
-				w.DrawImage(person.x - p.x, person.y - p.y, GoogleMapsImg::Person());
+				Image& src_img = images[i];
+				if (src_img.GetSize() == Size(0,0)) continue;
+				Image img = CachedRescale(src_img, Size(16,16));
+				Point p = img.GetSize() / 2;
+				w.DrawImage(person.x - p.x, person.y - p.y, img);
 			}
 			Point p = GoogleMapsImg::Pin().GetHotSpot();
 			w.DrawImage(home.x - p.x, home.y - p.y, GoogleMapsImg::Pin());
@@ -81,8 +85,8 @@ struct MapDlgDlg : public WithMapDlgLayout<TopWindow> {
 	void   Set(Pointf p);
 	Pointf Get() { return home; }
 	
-	void SetPersonCount(int i) {map.persons.SetCount(i);}
-	void SetPerson(int i, Pointf coord) {map.persons[i] = GoogleMapsGpsToPixel(center, ~zoom, Size(640, 640), coord);}
+	void SetPersonCount(int i) {map.persons.SetCount(i); map.images.SetCount(i);}
+	void SetPerson(int i, Pointf coord, Image img) {map.persons[i] = GoogleMapsGpsToPixel(center, ~zoom, Size(640, 640), coord); map.images[i] = img;}
 	
 	MapDlgDlg();
 	

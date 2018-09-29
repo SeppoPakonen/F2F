@@ -54,6 +54,12 @@ bool Client::Connect() {
 			Print("Client " + IntStr(user_id) + " Unable to connect to server!");
 			return false;
 		}
+		
+		// Pre-command: skip pre-commands
+		int i = -1;
+		int r = s->Put(&i, sizeof(int));
+		if (r != sizeof(int))
+			return false;
 	}
 	return true;
 }
@@ -137,7 +143,7 @@ void Client::StoreImageCache(const String& image_str) {
 	RealizeDirectory(img_folder);
 	String img_file = AppendFileName(img_folder, IntStr64(hash) + ".bin");
 	FileOut fout(img_file);
-	fout << image_str;
+	fout.Put(image_str.Begin(), image_str.GetCount());
 	fout.Close();
 }
 
@@ -272,12 +278,12 @@ bool Client::Set(const String& key, const String& value) {
 	
 	int ret = in.Get32();
 	if (ret == 1) {
-		Print("Client " + IntStr(user_id) + " set " + key + " = " + value + " FAILED");
+		Print("Client " + IntStr(user_id) + " set " + key + " FAILED");
 		return false;
 	}
 	else if (ret != 0) throw Exc("Setting value failed");
 	
-	Print("Client " + IntStr(user_id) + " set " + key + " = " + value);
+	Print("Client " + IntStr(user_id) + " set " + key);
 	return true;
 }
 
@@ -376,9 +382,14 @@ void Client::Poll() {
 	
 	lock.Enter();
 	
+	VectorMap<String, int> key_time;
+	Vector<Tuple<int, String> > join_list;
+	
 	int count = in.Get32();
 	if (count < 0 || count >= 10000) {lock.Leave(); throw Exc("Polling failed");}
 	for(int i = 0; i < count; i++) {
+		TimeStop ts;
+		
 		int sender_id = in.Get32();
 		int msg_len = in.Get32();
 		String message;
@@ -423,8 +434,7 @@ void Client::Poll() {
 			u.channels.FindAdd(ch_name);
 			Channel& ch = channels.GetAdd(ch_name);
 			ch.userlist.FindAdd(user_id);
-			ch.Post(-1, "Server", Format("User %s joined channel %s", u.name, ch_name));
-			PostCallback(THISBACK(RefreshGui));
+			join_list.Add(Tuple<int,String>(user_id, ch_name));
 		}
 		else if (key == "leave") {
 			Vector<String> args = Split(message, " ");
@@ -483,17 +493,44 @@ void Client::Poll() {
 			int user_id = ScanInt(user_id_str);
 			message = message.Mid(j+1);
 			j = users.Find(user_id);
-			if (j == -1) {lock.Leave(); throw Exc("User not found");}
-			User& u = users[j];
-			u.profile_image = StreamRaster::LoadStringAny(message);
-			u.profile_image_hash = message.GetHashValue();
 			StoreImageCache(message);
-			for(int i = 0; i < u.channels.GetCount(); i++) {
-				Channel& ch = channels.GetAdd(u.channels[i]);
-				ch.Post(-1, "Server", Format("User %s updated profile image", u.name));
+			if (j >= 0) {
+				User& u = users[j];
+				u.profile_image = StreamRaster::LoadStringAny(message);
+				u.profile_image_hash = message.GetHashValue();
+				for(int i = 0; i < u.channels.GetCount(); i++) {
+					Channel& ch = channels.GetAdd(u.channels[i]);
+					ch.Post(-1, "Server", Format("User %s updated profile image", u.name));
+				}
 			}
 		}
+		
+		key_time.GetAdd(key, 0) += ts.Elapsed();
 	}
+	
+	if (!join_list.IsEmpty()) {
+		
+		for(int i = 0; i < join_list.GetCount(); i++) {
+			int user_id = join_list[i].a;
+			String ch_name = join_list[i].b;
+			
+			String who;
+			Get("who " + IntStr(user_id), who);
+			MemReadStream in(who.Begin(), who.GetCount());
+			
+			Who(in);
+			
+			User& u = users.GetAdd(user_id);
+			RefreshUserImage(u);
+			
+			Channel& ch = channels.GetAdd(ch_name);
+			ch.Post(-1, "Server", Format("User %s joined channel %s", u.name, ch_name));
+		}
+		
+		PostCallback(THISBACK(RefreshGui));
+	}
+	
+	DUMPM(key_time);
 	
 	lock.Leave();
 }
@@ -580,6 +617,36 @@ void Client::RefreshChannellist() {
 	Print("Client " + IntStr(user_id) + " updated channellist (size " + IntStr(ch_count) + ")");
 }
 
+bool Client::Who(Stream& in) {
+	bool success = true;
+	int user_id = in.Get32();
+	int name_len = in.Get32();
+	if (name_len <= 0 || user_id < 0) return false;
+	String name = in.Get(name_len);
+	
+	User& u = users.GetAdd(user_id);
+	u.user_id = user_id;
+	u.name = name;
+	if (u.name.GetCount() != name_len) success = false;
+	
+	u.profile_image_hash = in.Get32();
+	in.Get(&u.longitude, sizeof(double));
+	in.Get(&u.latitude, sizeof(double));
+	in.Get(&u.elevation, sizeof(double));
+	
+	int channel_count = in.Get32();
+	if (channel_count < 0 || channel_count >= 200) return false;
+	for(int j = 0; j < channel_count; j++) {
+		int ch_len = in.Get32();
+		String ch_name = in.Get(ch_len);
+		u.channels.FindAdd(ch_name);
+		Channel& ch = channels.GetAdd(ch_name);
+		ch.userlist.FindAdd(user_id);
+	}
+	
+	return success;
+}
+
 void Client::RefreshUserlist() {
 	String userlist_str;
 	Get("userlist", userlist_str);
@@ -587,54 +654,33 @@ void Client::RefreshUserlist() {
 	
 	int user_count = in.Get32();
 	bool fail = false;
-	for(int i = 0; i < user_count; i++) {
-		int user_id = in.Get32();
-		int name_len = in.Get32();
-		if (name_len <= 0 || user_id < 0) continue;
-		String name = in.Get(name_len);
-		
-		User& u = users.GetAdd(user_id);
-		u.user_id = user_id;
-		u.name = name;
-		if (u.name.GetCount() != name_len) fail = true;
-		
-		u.profile_image_hash = in.Get32();
-		in.Get(&u.longitude, sizeof(double));
-		in.Get(&u.latitude, sizeof(double));
-		in.Get(&u.elevation, sizeof(double));
-		
-		int channel_count = in.Get32();
-		if (channel_count < 0 || channel_count >= 200) {fail = true; continue;}
-		for(int j = 0; j < channel_count; j++) {
-			int ch_len = in.Get32();
-			String ch_name = in.Get(ch_len);
-			u.channels.FindAdd(ch_name);
-			Channel& ch = channels.GetAdd(ch_name);
-			ch.userlist.FindAdd(user_id);
-		}
-	}
+	for(int i = 0; i < user_count; i++)
+		fail |= !Who(in);
 	if (fail) throw Exc("Getting userlist failed");
 	
 	for(int i = 0; i < users.GetCount(); i++) {
-		User& u = users[i];
-		String image_str;
-		
-		if (!HasCachedImage(u.profile_image_hash)) {
-			// Fetch image
-			Get("image " + IntStr64(u.profile_image_hash), image_str);
-			
-			// Store to hard drive
-			StoreImageCache(image_str);
-			
-		} else {
-			image_str = LoadImageCache(u.profile_image_hash);
-		}
-		
-		// Load to memory
-		u.profile_image = StreamRaster::LoadStringAny(image_str);
+		RefreshUserImage(users[i]);
 	}
 	
 	Print("Client " + IntStr(user_id) + " updated userlist (size " + IntStr(user_count) + ")");
+}
+
+void Client::RefreshUserImage(User& u) {
+	String image_str;
+	
+	if (!HasCachedImage(u.profile_image_hash)) {
+		// Fetch image
+		Get("image " + IntStr64(u.profile_image_hash), image_str);
+		
+		// Store to hard drive
+		StoreImageCache(image_str);
+		
+	} else {
+		image_str = LoadImageCache(u.profile_image_hash);
+	}
+	
+	// Load to memory
+	u.profile_image = StreamRaster::LoadStringAny(image_str);
 }
 
 void Client::RefreshGui() {
@@ -665,8 +711,8 @@ void Client::RefreshGui() {
 		map.SetPersonCount(count);
 		for(int i = 0; i < min(count, ch.userlist.GetCount()); i++) {
 			User& u = users.GetAdd(ch.userlist[i]);
-			irc.SetUser(i, u.name);
-			map.SetPerson(i, Pointf(u.longitude, u.latitude));
+			irc.SetUser(i, u.profile_image, u.name);
+			map.SetPerson(i, Pointf(u.longitude, u.latitude), u.profile_image);
 		}
 	}
 	
@@ -690,7 +736,7 @@ void Client::RefreshGuiChannel() {
 	irc.SetUserCount(ch.userlist.GetCount());
 	for(int i = 0; i < ch.userlist.GetCount(); i++) {
 		User& u = users.GetAdd(ch.userlist[i]);
-		irc.SetUser(i, u.name);
+		irc.SetUser(i, u.profile_image, u.name);
 	}
 	
 	RefreshGui();
@@ -886,7 +932,10 @@ IrcCtrl::IrcCtrl() {
 	chat.AddColumn("Message");
 	chat.ColumnWidths("2 1 8");
 	
+	users.AddColumn("Image");
 	users.AddColumn("Name");
+	users.ColumnWidths("1 3");
+	users.SetLineCy(32);
 	
 	channels.WhenChannel << THISBACK(SetChannel);
 }
@@ -907,8 +956,10 @@ void IrcCtrl::SetUserCount(int i) {
 	users.SetCount(i);
 }
 
-void IrcCtrl::SetUser(int i, String s) {
-	users.Set(i, 0, s);
+void IrcCtrl::SetUser(int i, Image img, String s) {
+	users.Set(i, 0, img);
+	users.SetDisplay(i, 0, ImageDisplay());
+	users.Set(i, 1, s);
 }
 
 
@@ -924,7 +975,7 @@ void IrcCtrl::SetUser(int i, String s) {
 
 
 
-StartupDialog::StartupDialog(Client& c) : cl(c) {
+StartupDialog::StartupDialog(Client& c) : cl(c), sd(*this) {
 	CtrlLayout(*this, "F2F startup");
 	
 	LoadThis();
@@ -982,6 +1033,7 @@ void StartupDialog::TryConnect() {
 bool StartupDialog::Connect() {
 	cl.SetAddress(srv_addr, srv_port);
 	cl.LoadThis();
+	cl.CloseConnection();
 	return cl.Connect() && cl.RegisterScript() && cl.LoginScript();
 }
 
@@ -990,10 +1042,11 @@ void StartupDialog::StopConnect() {
 }
 
 void StartupDialog::SelectServer() {
-	ServerDialog sd(*this);
-	if (sd.Run() == IDOK) {
+	sd.RefreshAddresses();
+	if (sd.Execute() == IDOK) {
 		int i = sd.serverlist.GetCursor();
 		if (i >= 0 && i < sd.servers.GetCount()) {
+			i = sd.serverlist.Get(i, 6);
 			addr.SetData(sd.servers[i].addr);
 			port.SetData(sd.servers[i].port);
 			StoreThis();
@@ -1037,9 +1090,12 @@ ServerDialog::ServerDialog(StartupDialog& sd) : sd(sd) {
 	serverlist.AddColumn("Title");
 	serverlist.AddColumn("Ping");
 	serverlist.AddColumn("Users");
+	serverlist.AddColumn("Max users");
 	serverlist.AddColumn("Address");
 	serverlist.AddColumn("Port");
-	serverlist.ColumnWidths("6 1 2 3 1");
+	serverlist.AddIndex();
+	serverlist.AddIndex();
+	serverlist.ColumnWidths("6 2 2 2 3 2");
 	
 	Thread::Start(THISBACK(RefreshAddresses));
 }
@@ -1081,54 +1137,64 @@ void ServerDialog::RefreshAddresses() {
 		return;
 	}
 	
+	for(auto& s : socks) {s.Timeout(1); s.Close();} while (running > 0) Sleep(100);
 	
+	running = servers.GetCount();
+	socks.SetCount(running);
 	for(int i = 0; i < servers.GetCount(); i++)
 		Thread::Start(THISBACK1(TestConnection, i));
 }
 
 void ServerDialog::TestConnection(int i) {
-	const Server& s = servers[i];
-	
-	{
-		GuiLock _;
-		serverlist.Set(i, 3, s.addr);
-		serverlist.Set(i, 4, s.port);
-	}
+	Server& server = servers[i];
+	TcpSocket& sock = socks[i];
 	
 	try {
-		TcpSocket sock;
+		sock.Timeout(10000);
 		
-		if (!sock.Connect(s.addr, s.port))
-			throw Exc("Couldn't connect " + s.addr + ":" + IntStr(s.port));
+		if (!sock.Connect(server.addr, server.port))
+			throw Exc("Couldn't connect " + server.addr + ":" + IntStr(server.port));
 		
 		TimeStop ts;
 		
 		int r, datalen = 0;
 		r = sock.Put(&datalen, sizeof(int));
-		if (r != sizeof(int)) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
 		int greet_len;
 		r = sock.Get(&greet_len, sizeof(int));
-		if (r != sizeof(int) || greet_len < 0 || greet_len > 1000) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		if (r != sizeof(int) || greet_len < 0 || greet_len > 1000) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
-		String greeting = sock.Get(greet_len);
+		server.greeting = sock.Get(greet_len);
 		
-		int sessions;
-		r = sock.Get(&sessions, sizeof(int));
-		if (r != sizeof(int)) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		r = sock.Get(&server.sessions, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
-		int max_sessions;
-		r = sock.Get(&max_sessions, sizeof(int));
-		if (r != sizeof(int)) throw Exc("Connection failed " + s.addr + ":" + IntStr(s.port));
+		r = sock.Get(&server.max_sessions, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
-		GuiLock _;
-		serverlist.Set(i, 0, greeting);
-		serverlist.Set(i, 1, IntStr(ts.Elapsed()));
-		serverlist.Set(i, 2, IntStr(sessions) + "/" + IntStr(max_sessions));
+		server.elapsed = ts.Elapsed();
 	}
 	catch (Exc e) {
 		Print(e);
-		
 	}
+	
+	PostCallback(THISBACK(Data));
+	running--;
 }
+
+void ServerDialog::Data() {
+	for(int i = 0; i < servers.GetCount(); i++) {
+		const Server& s = servers[i];
+		serverlist.Set(i, 0, s.greeting);
+		serverlist.Set(i, 1, (int)s.elapsed);
+		serverlist.Set(i, 2, s.sessions);
+		serverlist.Set(i, 3, s.max_sessions);
+		serverlist.Set(i, 4, s.addr);
+		serverlist.Set(i, 5, s.port);
+		serverlist.Set(i, 6, i);
+	}
+	serverlist.SetSortColumn(2, true);
+}
+
 

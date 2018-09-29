@@ -90,9 +90,27 @@ void Server::Listen() {
 					int id = session_counter++;
 					ses->sess_id = id;
 					
-					lock.EnterWrite();
-					sessions.Add(id, ses.Detach()).Start();
-					lock.LeaveWrite();
+					int pre_cmd;
+					ses->s.Get(&pre_cmd, sizeof(int));
+					
+					// Is greeting request
+					if (pre_cmd == 0) {
+						String title = Config::server_title;
+						int i = title.GetCount();
+						ses->s.Put(&i, sizeof(int));
+						ses->s.Put(title.Begin(), title.GetCount());
+						i = sessions.GetCount();
+						ses->s.Put(&i, sizeof(int));
+						i = Config::max_sessions;
+						ses->s.Put(&i, sizeof(int));
+						ses->s.Close();
+					}
+					// Is normal session
+					else if (sessions.GetCount() < Config::max_sessions) {
+						lock.EnterWrite();
+						sessions.Add(id, ses.Detach()).Start();
+						lock.LeaveWrite();
+					}
 				}
 			}
 			
@@ -251,25 +269,6 @@ void ActiveSession::Run() {
 			int in_size;
 			r = s.Get(&in_size, sizeof(in_size));
 			if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) throw Exc("Received invalid size");
-			
-			// Greeting
-			if (in_size == 0) {
-				String title = Config::server_title;
-				int i = title.GetCount();
-				s.Put(&i, sizeof(int));
-				s.Put(title.Begin(), title.GetCount());
-				i = server->sessions.GetCount();
-				s.Put(&i, sizeof(int));
-				i = Config::max_sessions;
-				s.Put(&i, sizeof(int));
-				s.Close();
-				break;
-			}
-			// Limit amount of sessions
-			else if (count == 0 && server->sessions.GetCount() >= Config::max_sessions) {
-				s.Close();
-				break;
-			}
 			
 			String in_data = s.Get(in_size);
 			if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
@@ -493,6 +492,34 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 	out.Put32(ret);
 }
 
+void ActiveSession::Who(int user_id, Stream& out) {
+	int j = server->user_session_ids.Find(user_id);
+	if (j == -1) {
+		out.Put32(-1);
+		out.Put32(0);
+		return;
+	}
+	j = server->user_session_ids[j];
+	const ActiveSession& as = server->sessions.Get(j);
+	const UserDatabase& db = GetDatabase(as.user_id);
+	out.Put32(as.user_id);
+	out.Put32(db.name.GetCount());
+	if (!db.name.IsEmpty())
+		out.Put(db.name.Begin(), db.name.GetCount());
+	
+	out.Put32(db.profile_img_hash);
+	out.Put(&db.longitude, sizeof(double));
+	out.Put(&db.latitude, sizeof(double));
+	out.Put(&db.elevation, sizeof(double));
+	
+	out.Put32(as.channels.GetCount());
+	for(int j = 0; j < as.channels.GetCount(); j++) {
+		const Channel& ch = server->channels.Get(as.channels[j]);
+		out.Put32(ch.name.GetCount());
+		out.Put(ch.name.Begin(), ch.name.GetCount());
+	}
+}
+
 void ActiveSession::Get(Stream& in, Stream& out) {
 	int r;
 	int key_len;
@@ -531,34 +558,8 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 		GetUserlist(userlist);
 		userlist.RemoveKey(user_id);
 		out.Put32(userlist.GetCount());
-		for(int i = 0; i < userlist.GetCount(); i++) {
-			int j = userlist[i];
-			j = server->user_session_ids.Find(j);
-			if (j == -1) {
-				out.Put32(-1);
-				out.Put32(0);
-				continue;
-			}
-			j = server->user_session_ids[j];
-			const ActiveSession& as = server->sessions.Get(j);
-			const UserDatabase& db = GetDatabase(as.user_id);
-			out.Put32(as.user_id);
-			out.Put32(db.name.GetCount());
-			if (!db.name.IsEmpty())
-				out.Put(db.name.Begin(), db.name.GetCount());
-			
-			out.Put32(db.profile_img_hash);
-			out.Put(&db.longitude, sizeof(double));
-			out.Put(&db.latitude, sizeof(double));
-			out.Put(&db.elevation, sizeof(double));
-			
-			out.Put32(as.channels.GetCount());
-			for(int j = 0; j < as.channels.GetCount(); j++) {
-				const Channel& ch = server->channels.Get(as.channels[j]);
-				out.Put32(ch.name.GetCount());
-				out.Put(ch.name.Begin(), ch.name.GetCount());
-			}
-		}
+		for(int i = 0; i < userlist.GetCount(); i++)
+			Who(userlist[i], out);
 		
 		server->lock.LeaveRead();
 	}
@@ -572,12 +573,15 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 		String img_file = AppendFileName(img_folder, args[0] + ".bin");
 		if (FileExists(img_file)) {
 			String image_str = LoadFile(img_file);
-			out.Put32(image_str.GetCount());
 			out.Put(image_str.Begin(), image_str.GetCount());
 		}
 		else {
 			out.Put32(0);
 		}
+	}
+	else if (key == "who" && args.GetCount() == 1) {
+		int user_id = StrInt(args[0]);
+		Who(user_id, out);
 	}
 	
 	out.Seek(size_pos);

@@ -36,6 +36,10 @@ void Client::Run() {
 		bool logged_in = false;
 		
 		try {
+			int pre_cmd = -1;
+			int r = s->Put(&pre_cmd, sizeof(int));
+			if (r != sizeof(int)) throw Exc("Precommand skipping failed");
+			
 			while (!Thread::IsShutdownThreads() && s->IsOpen()) {
 				
 				int action;
@@ -46,15 +50,17 @@ void Client::Run() {
 					action = 200;
 				}
 				else {
-					double p = Randomf();
-					if (p < 0.1)		action = 301;
-					else if (p < 0.2)	action = 400;
-					else if (p < 0.3)	action = 500;
-					else if (p < 0.6)	action = 600;
-					else if (p < 0.7)	action = 700;
-					else if (p < 0.8)	action = 800;
-					else if (p < 0.9)	action = 900;
-					else				action = 1000;
+					switch (Random(9)) {
+						case 0:	action = 301;	break;
+						case 1:	action = 400;	break;
+						case 2:	action = 500;	break;
+						case 3:	action = 600;	break;
+						case 4:	action = 700;	break;
+						case 5:	action = 800;	break;
+						case 6:	action = 900;	break;
+						case 7:	action = 1000;	break;
+						case 8:	action = 302;	break;
+					}
 				}
 				
 				switch (action) {
@@ -65,8 +71,7 @@ void Client::Run() {
 									logged_in = true;
 									break;
 					case 301:		Set("name", RandomName()); break;
-					//case 300:		Set(); break;
-					//case 400:		Get(); break;
+					case 302:		Set("profile_image", RandomImage()); break;
 					case 500:		Join(RandomNewChannel()); break;
 					case 600:		Leave(RandomOldChannel()); break;
 					case 700:		Message(RandomUser(), RandomMessage()); break;
@@ -283,7 +288,7 @@ void Client::Poll() {
 		int recv_len = message.GetCount();
 		bool is_eof = in.IsEof();
 		if (recv_len != msg_len) throw Exc("Polling failed");
-		Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + IntStr(message.GetCount()));
+		//Print("Client " + IntStr(id) + " received from " + IntStr(sender_id) + ": " + IntStr(message.GetCount()));
 		
 		int j = message.Find(" ");
 		if (j == -1) continue;
