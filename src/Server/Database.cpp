@@ -65,11 +65,13 @@ void UserDatabase::SetLocation(double longitude, double latitude, double elevati
 	
 	lock.Enter();
 	
-	location.Put(&longitude, sizeof(double));
-	location.Put(&latitude, sizeof(double));
-	location.Put(&elevation, sizeof(double));
-	location.Put(&now, sizeof(Time));
-	location.Flush();
+	if (location.IsOpen()) {
+		location.Put(&longitude, sizeof(double));
+		location.Put(&latitude, sizeof(double));
+		location.Put(&elevation, sizeof(double));
+		location.Put(&now, sizeof(Time));
+		location.Flush();
+	}
 	
 	lock.Leave();
 }

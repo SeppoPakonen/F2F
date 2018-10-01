@@ -63,21 +63,27 @@ void Server::Listen() {
 		int r = master.Put(&port, sizeof(uint16));
 		if (r != sizeof(uint16)) throw Exc("Master server connection failed (1)");
 		
-		TcpSocket verify;
-		verify.Timeout(10000);
-		if (!verify.Accept(listener)) throw Exc("Master server couldn't connect this server");
-		int chk;
-		r = verify.Get(&chk, sizeof(int));
-		if (r != sizeof(int) || chk != 12345678) throw Exc("Master server couldn't connect this server");
-		r = verify.Put(&chk, sizeof(int));
-		if (r != sizeof(int)) throw Exc("Master server couldn't connect this server");
-		
-		int ret;
-		r = master.Get(&ret, sizeof(int));
-		if (r != sizeof(int)) throw Exc("Master server connection failed");
-		if (ret != 0) throw Exc("Master server couldn't connect this server");
-		master.Close();
-		
+		bool success = false;
+		for(int i = 0; i < 1000; i++) {
+			TcpSocket verify;
+			verify.Timeout(10000);
+			if (!verify.Accept(listener)) continue;
+			int chk;
+			r = verify.Get(&chk, sizeof(int));
+			if (r != sizeof(int) || chk != 12345678) continue;
+			r = verify.Put(&chk, sizeof(int));
+			if (r != sizeof(int)) continue;
+			
+			int ret;
+			r = master.Get(&ret, sizeof(int));
+			if (r != sizeof(int)) continue;
+			if (ret != 0) continue;
+			master.Close();
+			
+			success = true;
+			break;
+		}
+		if (!success) throw Exc("Master server couldn't connect this server");
 		
 		Print("Waiting for requests..");
 		TimeStop ts;
@@ -258,7 +264,9 @@ ActiveSession::ActiveSession() {
 
 void ActiveSession::GetUserlist(Index<int>& userlist) {
 	for(int i = 0; i < channels.GetCount(); i++) {
-		const Channel& ch = server->channels.Get(channels[i]);
+		int j = server->channels.Find(channels[i]);
+		if (j == -1) continue;
+		const Channel& ch = server->channels[j];
 		for(int j = 0; j < ch.users.GetCount(); j++)
 			userlist.FindAdd(ch.users[j]);
 	}
@@ -477,10 +485,10 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		db.name = value;
 		db.Flush();
 		
+		server->lock.EnterRead();
 		Index<int> userlist;
 		GetUserlist(userlist);
 		userlist.RemoveKey(user_id);
-		server->lock.EnterRead();
 		server->SendMessage(user_id, "name " + IntStr(user_id) + " " + value, userlist);
 		server->lock.LeaveRead();
 	}
@@ -505,7 +513,13 @@ void ActiveSession::Who(int user_id, Stream& out) {
 		return;
 	}
 	j = server->user_session_ids[j];
-	const ActiveSession& as = server->sessions.Get(j);
+	j = server->sessions.Find(j);
+	if (j == -1) {
+		out.Put32(-1);
+		out.Put32(0);
+		return;
+	}
+	const ActiveSession& as = server->sessions[j];
 	const UserDatabase& db = GetDatabase(as.user_id);
 	out.Put32(as.user_id);
 	out.Put32(db.name.GetCount());
@@ -638,7 +652,7 @@ void ActiveSession::Leave(Stream& in, Stream& out) {
 void ActiveSession::Location(Stream& in, Stream& out) {
 	UserDatabase& db = GetDatabase(user_id);
 	int r;
-	double lat, lon, elev;
+	double lat = 0, lon = 0, elev = 0;
 	r = in.Get(&lat, sizeof(lat));
 	if (r != sizeof(double)) throw Exc("Invalid location argument");
 	r = in.Get(&lon, sizeof(lon));
@@ -648,10 +662,10 @@ void ActiveSession::Location(Stream& in, Stream& out) {
 	
 	db.SetLocation(lon, lat, elev);
 	
+	server->lock.EnterRead();
 	Index<int> userlist;
 	GetUserlist(userlist);
 	userlist.RemoveKey(user_id);
-	server->lock.EnterRead();
 	server->SendMessage(user_id, "loc " + IntStr(user_id) + " " + DblStr(lon) + " " + DblStr(lat) + " " + DblStr(elev), userlist);
 	server->lock.LeaveRead();
 	

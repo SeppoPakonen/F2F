@@ -806,6 +806,7 @@ void Client::RefreshNearest() {
 	for(int i = 0; i < u.channels.GetCount(); i++) {
 		details.channels.Set(i, 0, u.channels[i]);
 	}
+	details.channels.SetCount(u.channels.GetCount());
 }
 
 void Client::Command(String cmd) {
