@@ -27,7 +27,7 @@ enum {
 class UserDatabase {
 	
 	// Temporary
-	SpinLock lock;
+	Mutex lock;
 	String user_file, user_loc_file;
 	FileAppend location;
 	int user_id = -1;
@@ -101,7 +101,7 @@ protected:
 	friend class Server;
 	
 	Server* server = NULL;
-	SpinLock lock;
+	Mutex lock;
 	TcpSocket s;
 	
 	int sess_id = -1;

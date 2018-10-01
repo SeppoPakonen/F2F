@@ -548,7 +548,7 @@ CONSOLE_APP_MAIN
 {
 	Array<Client> clients;
 	
-	for(int i = 0; i < 100; i++) {
+	for(int i = 0; i < 10; i++) {
 		Client& c = clients.Add();
 		c.SetId(i);
 		c.Start();
