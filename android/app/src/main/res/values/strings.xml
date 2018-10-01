@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">F2F</string>
     <string name="title_activity_maps">F2F User map</string>
+    <string name="messages">Messages</string>
+    <string name="locshare">Location sharing</string>
+    <string name="allinterests">All interests</string>
+    <string name="settings">Settings</string>
+    <string name="faq">FAQs</string>
+    <string name="share">Share this app</string>
+    <string name="headertitle">Header title</string>
 </resources>

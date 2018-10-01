@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android" >
+    <group
+        android:id="@+id/menu_top"
+        android:checkableBehavior="single">
+
+        <item
+            android:id="@+id/nav_messages"
+            android:icon="@drawable/ic_chat_black_24dp"
+            android:title="@string/messages" />
+        <item
+            android:id="@+id/nav_locshare"
+            android:icon="@drawable/ic_location_on_black_24dp"
+            android:title="@string/locshare" />
+        <item
+            android:id="@+id/nav_allinterests"
+            android:icon="@drawable/ic_public_black_24dp"
+            android:title="@string/allinterests" />
+    </group>
+    <group
+        android:id="@+id/menu_bottom"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_settings"
+            android:title="@string/settings" />
+        <item
+            android:id="@+id/nav_faq"
+            android:title="@string/faq" />
+        <item
+            android:id="@+id/nav_share"
+            android:title="@string/share" />
+    </group>
+</menu>
