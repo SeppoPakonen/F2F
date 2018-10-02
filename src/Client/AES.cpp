@@ -1,7 +1,9 @@
 #include <Core/Core.h>
 
-#undef _WIN32
-#define OPENSSL_SYS_WINDOWS
+#ifdef flagWIN32
+	#undef _WIN32
+	#define OPENSSL_SYS_WINDOWS
+#endif
 #include <openssl/rand.h>
 #include "AES.h"
 

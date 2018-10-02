@@ -5,6 +5,8 @@ uses
 
 library(WIN32) "ssleay32MT libeay32MT";
 
+library(POSIX) "ssl crypto";
+
 file
 	main.cpp,
 	Client.h,
