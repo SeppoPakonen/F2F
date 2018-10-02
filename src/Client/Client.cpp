@@ -43,6 +43,9 @@ Client::Client() {
 	Title("F2F Client program");
 	Sizeable().MaximizeBox().MinimizeBox();
 	
+	AddFrame(menu);
+	menu.Set(THISBACK(MainMenu));
+	
 	Add(split.SizePos());
 	split << irc << rvsplit;
 	split.Horz();
@@ -75,6 +78,16 @@ Client::~Client() {
 	running = false;
 	if (!s.IsEmpty()) s->Close();
 	while (!stopped) Sleep(100);
+}
+
+void Client::MainMenu(Bar& bar) {
+	bar.Sub("File", [=](Bar& bar) {
+		bar.Add("Join a channel", THISBACK(JoinChannel));
+	});
+	bar.Sub("Help", [=](Bar& bar) {
+		
+	});
+	
 }
 
 bool Client::Connect() {
@@ -937,6 +950,34 @@ void Client::Command(String cmd) {
 	}
 }
 
+void Client::JoinChannel() {
+	String channels_data;
+	Get("allchannellist", channels_data);
+	MemReadStream data(channels_data.Begin(), channels_data.GetCount());
+	
+	WithAllChannels<TopWindow> win;
+	CtrlLayoutOKCancel(win, "All channels");
+	win.chlist.AddColumn("Channel");
+	win.chlist.AddColumn("User count");
+	win.chlist.ColumnWidths("4 1");
+	win.chlist.WhenLeftDouble << Proxy(win.ok.WhenAction);
+	
+	int ch_count = data.Get32();
+	for(int i = 0; i < ch_count; i++) {
+		int ch_len = data.Get32();
+		String ch = data.Get(ch_len);
+		int user_count = data.Get32();
+		
+		win.chlist.Set(i, 0, ch);
+		win.chlist.Set(i, 1, user_count);
+	}
+	win.chlist.SetSortColumn(0, false);
+	if (win.Execute() == IDOK) {
+		int cursor = win.chlist.GetCursor();
+		if (cursor >= 0 && cursor < win.chlist.GetCount())
+			Join(win.chlist.Get(cursor, 0));
+	}
+}
 
 
 

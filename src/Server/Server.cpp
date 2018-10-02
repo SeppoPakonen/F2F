@@ -582,6 +582,26 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 		
 		server->lock.LeaveRead();
 	}
+	else if (key == "allchannellist") {
+		server->lock.EnterRead();
+		VectorMap<String, int> ch_list;
+		for(int i = 0; i < server->channels.GetCount(); i++) {
+			const Channel& ch = server->channels[i];
+			if (ch.name.Left(1) == ".") continue; // skip hidden channels
+			int count = ch.users.GetCount();
+			if (!count) continue;
+			ch_list.Add(ch.name, count);
+		}
+		server->lock.LeaveRead();
+		
+		out.Put32(ch_list.GetCount());
+		for(int i = 0; i < ch_list.GetCount(); i++) {
+			const String& name = ch_list.GetKey(i);
+			out.Put32(name.GetCount());
+			out.Put(name.Begin(), name.GetCount());
+			out.Put32(ch_list[i]);
+		}
+	}
 	else if (key == "userlist") {
 		server->lock.EnterRead();
 		

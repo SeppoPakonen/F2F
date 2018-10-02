@@ -114,6 +114,7 @@ class Client : public TopWindow {
 	Mutex call_lock, lock;
 	
 	
+	MenuBar menu;
 	Splitter split, rvsplit, rhsplit;
 	IrcCtrl irc;
 	MapDlgDlg map;
@@ -133,6 +134,7 @@ public:
 	void LoadThis() {LoadFromFile(*this, ConfigFile("Client" + IntStr64(GetServerHash()) + ".bin"));}
 	unsigned GetServerHash() {CombineHash h; h << addr << port; return h;}
 	
+	void MainMenu(Bar& bar);
 	bool Connect();
 	void CloseConnection() {if (!s.IsEmpty()) s->Close(); is_logged_in = false;}
 	bool LoginScript();
@@ -164,6 +166,7 @@ public:
 	void RefreshUserImage(User& u);
 	bool Who(Stream& in);
 	void ChangeLocation(Pointf coord);
+	void JoinChannel();
 	
 	void RefreshGui();
 	void RefreshGuiChannel();

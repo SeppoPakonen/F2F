@@ -72,3 +72,9 @@ LAYOUT(RegisterDialog, 272, 92)
 	ITEM(EditInt, username, LeftPosZ(148, 120).TopPosZ(4, 24))
 END_LAYOUT
 
+LAYOUT(AllChannels, 460, 360)
+	ITEM(Button, cancel, SetLabel(t_("Cancel")).RightPosZ(148, 136).BottomPosZ(4, 24))
+	ITEM(Button, ok, SetLabel(t_("OK")).RightPosZ(4, 140).BottomPosZ(4, 24))
+	ITEM(ArrayCtrl, chlist, HSizePosZ(4, 6).VSizePosZ(4, 32))
+END_LAYOUT
+
