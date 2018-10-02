@@ -19,6 +19,7 @@ struct User : Moveable<User> {
 	// Detailed information
 	Index<String> channels;
 	double longitude = 0, latitude = 0, elevation = 0;
+	int age = 0, gender = 0;
 	unsigned profile_img_hash;
 };
 
@@ -27,6 +28,7 @@ class Client {
 	Index<String> joined_channels;
 	String user_name, pass;
 	One<TcpSocket> s;
+	int age = 0, gender = 0;
 	int id = -1;
 	int user_id = -1;
 	

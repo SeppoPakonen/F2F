@@ -31,6 +31,8 @@ struct User : Moveable<User> {
 	Index<String> channels;
 	double longitude = 0, latitude = 0, elevation = 0;
 	unsigned profile_image_hash = 0;
+	unsigned age = 0;
+	bool gender = 1;
 	Image profile_image;
 };
 
@@ -105,6 +107,8 @@ class Client : public TopWindow {
 	String addr = "127.0.0.1";
 	One<TcpSocket> s;
 	int port = 17000;
+	int age = 0;
+	bool gender = 0;
 	bool is_logged_in = false;
 	bool running = false, stopped = true;
 	Mutex call_lock, lock;
@@ -121,6 +125,9 @@ public:
 	Client();
 	~Client();
 	
+	int GetUserId() const {return user_id;}
+	String GetPassword() const {return pass;}
+	
 	void Serialize(Stream& s) {s % user_id % pass % is_registered;}
 	void StoreThis() {StoreToFile(*this, ConfigFile("Client" + IntStr64(GetServerHash()) + ".bin"));}
 	void LoadThis() {LoadFromFile(*this, ConfigFile("Client" + IntStr64(GetServerHash()) + ".bin"));}
@@ -136,6 +143,8 @@ public:
 	void SetAddress(String a, int p) {addr = a; port = p;}
 	void SetName(String s);
 	void SetImage(Image i);
+	void SetAge(int i);
+	void SetGender(bool b);
 	void StoreImageCache(const String& image_str);
 	bool HasCachedImage(unsigned hash);
 	String LoadImageCache(unsigned hash);
@@ -175,13 +184,13 @@ class PreviewImage : public ImageCtrl {
 	}
 };
 
-class StartupDialog;
+class ServerDialog;
 
-class ServerDialog : public WithSelectServer<TopWindow> {
-	StartupDialog& sd;
+class SelectServerDialog : public WithSelectServer<TopWindow> {
+	ServerDialog& sd;
 	
 protected:
-	friend class StartupDialog;
+	friend class ServerDialog;
 	
 	struct Server : Moveable<Server> {
 		String greeting, addr;
@@ -193,31 +202,46 @@ protected:
 	int running = 0;
 	
 public:
-	typedef ServerDialog CLASSNAME;
-	ServerDialog(StartupDialog& sd);
-	~ServerDialog() {for(auto& s : socks) {s.Timeout(1); s.Close();} while (running > 0) Sleep(100);}
+	typedef SelectServerDialog CLASSNAME;
+	SelectServerDialog(ServerDialog& sd);
+	~SelectServerDialog() {for(auto& s : socks) {s.Timeout(1); s.Close();} while (running > 0) Sleep(100);}
 	
 	void RefreshAddresses();
 	void TestConnection(int i);
 	void Data();
 };
 
-class StartupDialog : public WithStartupDialog<TopWindow> {
+class RegisterDialog : public WithRegisterDialog<TopWindow> {
+	ServerDialog& sd;
+	
+public:
+	typedef RegisterDialog CLASSNAME;
+	RegisterDialog(ServerDialog& sd);
+	~RegisterDialog();
+	
+	void Register();
+	void TryRegister();
+};
+
+class ServerDialog : public WithServerDialog<TopWindow> {
+	
+protected:
+	friend class RegisterDialog;
 	
 	// Persistent
-	Image profile_image;
-	String name, srv_addr;
+	String srv_addr;
 	int srv_port;
 	bool autoconnect = false;
 	
 	// Temporary
 	Client& cl;
 	bool connecting = false;
-	ServerDialog sd;
+	SelectServerDialog sd;
+	RegisterDialog rd;
 	
 public:
-	typedef StartupDialog CLASSNAME;
-	StartupDialog(Client& c);
+	typedef ServerDialog CLASSNAME;
+	ServerDialog(Client& c);
 	
 	void StartTryConnect() {Enable(false); Thread::Start(THISBACK(TryConnect));}
 	void StartStopConnect() {Thread::Start(THISBACK(StopConnect));}
@@ -226,16 +250,44 @@ public:
 	void Close0() {Close();}
 	void SetError(String e) {error.SetLabel(e);}
 	void Enable(bool b);
-	bool Connect();
+	bool Connect(bool do_login);
+	void Register();
 	void SelectServer();
-	void SelectImage();
-	void Setup();
 	
 	bool IsAutoConnect() const {return autoconnect;}
 	
-	void StoreThis() {StoreToFile(*this, ConfigFile("Startup.bin"));}
-	void LoadThis() {LoadFromFile(*this, ConfigFile("Startup.bin"));}
-	void Serialize(Stream& s) {s % profile_image % name % srv_addr % srv_port % autoconnect;}
+	void StoreThis() {StoreToFile(*this, ConfigFile("ClientServer.bin"));}
+	void LoadThis() {LoadFromFile(*this, ConfigFile("ClientServer.bin"));}
+	void Serialize(Stream& s) {s % srv_addr % srv_port % autoconnect;}
+	
+};
+
+class SettingsDialog : public WithSettingsDialog<TopWindow> {
+	
+	// Persistent
+	Image profile_image;
+	String name;
+	int age = 18;
+	bool gender = 1;
+	bool is_first_start = true;
+	
+	// Temporary
+	Client& cl;
+	
+public:
+	typedef SettingsDialog CLASSNAME;
+	SettingsDialog(Client& cl);
+	
+	void Close0() {Close();}
+	
+	void SelectImage();
+	bool Setup();
+	
+	bool IsFirstStart() const {return is_first_start;}
+	
+	void StoreThis() {StoreToFile(*this, ConfigFile("Settings.bin"));}
+	void LoadThis() {LoadFromFile(*this, ConfigFile("Settings.bin"));}
+	void Serialize(Stream& s) {s % profile_image % name % age % gender % is_first_start;}
 	
 };
 

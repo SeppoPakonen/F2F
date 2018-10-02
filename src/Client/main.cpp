@@ -9,17 +9,25 @@ GUI_APP_MAIN {
 	SetIniFile(ConfigFile("Client.ini"));
 	
 	Client c;
-	StartupDialog startup(c);
+	ServerDialog server(c);
+	SettingsDialog settings(c);
 	
-	if (!startup.IsAutoConnect()) {
-		startup.Run();
+	if (!server.IsAutoConnect()) {
+		server.Run();
 	} else {
-		if (!startup.Connect())
-			startup.Run();
+		if (!server.Connect(true))
+			server.Run();
 	}
+	server.Close();
 	
 	if (c.IsConnected()) {
-		startup.Setup();
+		if (settings.IsFirstStart()) {
+			if (settings.Run() != IDOK)
+				return;
+		}
+		settings.Setup();
+		settings.Close();
+		
 		c.Start();
 		c.Run();
 	}

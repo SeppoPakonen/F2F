@@ -46,12 +46,14 @@ public:
 	String name, profile_img;
 	unsigned profile_img_hash = 0;
 	unsigned passhash = 0;
+	unsigned age = 0;
 	Time joined, lastlogin;
 	int64 logins = 0, onlinetotal = 0, visibletotal = 0;
 	double longitude = 0, latitude = 0, elevation = 0;
 	Time lastupdate;
+	bool gender = 1;
 	
-	void Serialize(Stream& s) {s % name % profile_img % profile_img_hash % channels % passhash % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate;}
+	void Serialize(Stream& s) {s % name % profile_img % profile_img_hash % channels % passhash % age % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate % gender;}
 	void Flush();
 	void SetLocation(double longitude, double latitude, double elevation);
 };

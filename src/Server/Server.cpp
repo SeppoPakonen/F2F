@@ -428,6 +428,8 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 	
 	out.Put32(db.name.GetCount());
 	out.Put(db.name.Begin(), db.name.GetCount());
+	out.Put32(db.age);
+	out.Put32(db.gender);
 }
 
 void ActiveSession::Logout() {
@@ -492,6 +494,14 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		server->SendMessage(user_id, "name " + IntStr(user_id) + " " + value, userlist);
 		server->lock.LeaveRead();
 	}
+	else if (key == "age") {
+		db.age = ScanInt(value);
+		db.Flush();
+	}
+	else if (key == "gender") {
+		db.gender = ScanInt(value);
+		db.Flush();
+	}
 	else if (key == "profile_image") {
 		if (value.GetCount() > Config::max_image_size) throw Exc("Invalid image received");
 		db.profile_img = value;
@@ -525,6 +535,8 @@ void ActiveSession::Who(int user_id, Stream& out) {
 	out.Put32(db.name.GetCount());
 	if (!db.name.IsEmpty())
 		out.Put(db.name.Begin(), db.name.GetCount());
+	out.Put32(db.age);
+	out.Put32(db.gender);
 	
 	out.Put32(db.profile_img_hash);
 	out.Put(&db.longitude, sizeof(double));

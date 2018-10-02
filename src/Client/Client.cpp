@@ -114,15 +114,16 @@ bool Client::RegisterScript() {
 
 bool Client::LoginScript() {
 	if (!is_logged_in) {
+		lock.Enter();
+		users.Clear();
+		channels.Clear();
+		lock.Leave();
+		
 		try {
-			lock.Enter();
-			users.Clear();
-			channels.Clear();
-			lock.Leave();
-			
 			Login();
 			RefreshChannellist();
 			RefreshUserlist();
+			ChangeLocation(map.Get());
 			is_logged_in = true;
 			PostCallback(THISBACK(RefreshGui));
 		}
@@ -141,6 +142,28 @@ void Client::SetName(String s) {
 	}
 	catch (Exc e) {
 		Print("Changing name failed");
+	}
+}
+
+void Client::SetAge(int i) {
+	if (age == i) return;
+	try {
+		if (Set("age", IntStr(i)))
+			age = i;
+	}
+	catch (Exc e) {
+		Print("Changing age failed");
+	}
+}
+
+void Client::SetGender(bool b) {
+	if (gender == b) return;
+	try {
+		if (Set("gender", IntStr(b)))
+			gender = b;
+	}
+	catch (Exc e) {
+		Print("Changing gender failed");
 	}
 }
 
@@ -231,6 +254,7 @@ void Client::HandleConnection() {
 		}
 		
 		s.Clear();
+		is_logged_in = false;
 	}
 	
 	Print("Client " + IntStr(user_id) + " Stopping");
@@ -299,6 +323,9 @@ void Client::Login() {
 	
 	int name_len = in.Get32();
 	user_name = in.Get(name_len);
+	
+	age = in.Get32();
+	gender = in.Get32();
 	
 	Print("Client " + IntStr(user_id) + " logged in (" + IntStr(user_id) + ", " + pass + ") nick: " + user_name);
 }
@@ -670,6 +697,8 @@ bool Client::Who(Stream& in) {
 	u.user_id = user_id;
 	u.name = name;
 	if (u.name.GetCount() != name_len) success = false;
+	u.age = in.Get32();
+	u.gender = in.Get32();
 	
 	u.profile_image_hash = in.Get32();
 	in.Get(&u.longitude, sizeof(double));
@@ -803,6 +832,8 @@ void Client::RefreshNearest() {
 	User& u = users.GetAdd(user_id);
 	details.profile_img.SetImage(u.profile_image);
 	details.name.SetLabel(u.name);
+	details.age.SetLabel(IntStr(u.age));
+	details.gender.SetLabel(u.gender ? "Male" : "Female");
 	for(int i = 0; i < u.channels.GetCount(); i++) {
 		details.channels.Set(i, 0, u.channels[i]);
 	}
@@ -1040,32 +1071,35 @@ void IrcCtrl::SetUser(int i, Image img, String s) {
 
 
 
+int PasswordFilter(int c) {
+	return '*';
+}
 
-
-StartupDialog::StartupDialog(Client& c) : cl(c), sd(*this) {
-	CtrlLayout(*this, "F2F startup");
+ServerDialog::ServerDialog(Client& c) : cl(c), sd(*this), rd(*this) {
+	CtrlLayout(*this, "F2F select server");
+	
+	password.SetFilter(PasswordFilter);
 	
 	LoadThis();
 	
-	image.SetImage(profile_image);
-	nick.SetData(name);
 	addr.SetData(srv_addr);
 	port.SetData(srv_port);
 	auto_connect.Set(autoconnect);
 	
+	reg <<= THISBACK(Register);
 	selectserver <<= THISBACK(SelectServer);
-	selectimage <<= THISBACK(SelectImage);
 	
-	nick.SetFocus();
+	addr.SetFocus();
 	Enable(true);
 }
 
-void StartupDialog::Enable(bool b) {
-	nick.Enable(b);
+void ServerDialog::Enable(bool b) {
+	reg.Enable(b);
+	username.Enable(b);
+	password.Enable(b);
 	addr.Enable(b);
 	port.Enable(b);
 	auto_connect.Enable(b);
-	selectimage.Enable(b);
 	selectserver.Enable(b);
 	connect.Enable(b);
 	if (b) {
@@ -1077,38 +1111,44 @@ void StartupDialog::Enable(bool b) {
 	}
 }
 
-void StartupDialog::TryConnect() {
-	name = nick.GetData();
+void ServerDialog::TryConnect() {
 	autoconnect = auto_connect.Get();
 	srv_addr = addr.GetData();
 	srv_port = port.GetData();
 	StoreThis();
 	
-	if (profile_image.GetSize() == Size(0,0))
-		PostCallback(THISBACK1(SetError, "Profile image is not set"));
-	else if (name.IsEmpty())
-		PostCallback(THISBACK1(SetError, "Profile name is empty"));
-	else if (srv_addr.IsEmpty())
+	if (srv_addr.IsEmpty())
 		PostCallback(THISBACK1(SetError, "Server address is empty"));
-	else if (Connect())
+	else if (Connect(true))
 		PostCallback(THISBACK(Close0));
 	else
 		PostCallback(THISBACK1(SetError, "Connecting server failed"));
 	PostCallback(THISBACK1(Enable, true));
 }
 
-bool StartupDialog::Connect() {
+bool ServerDialog::Connect(bool do_login) {
+	srv_addr = addr.GetData();
+	srv_port = port.GetData();
 	cl.SetAddress(srv_addr, srv_port);
 	cl.LoadThis();
 	cl.CloseConnection();
-	return cl.Connect() && cl.RegisterScript() && cl.LoginScript();
+	return cl.Connect() && cl.RegisterScript() && (!do_login || cl.LoginScript());
 }
 
-void StartupDialog::StopConnect() {
+void ServerDialog::StopConnect() {
 	cl.CloseConnection();
 }
 
-void StartupDialog::SelectServer() {
+void ServerDialog::Register() {
+	rd.Register();
+	if (rd.Execute() == IDOK) {
+		username.SetData(rd.username.GetData());
+		password.SetData(rd.password.GetData());
+		StoreThis();
+	}
+}
+
+void ServerDialog::SelectServer() {
 	sd.RefreshAddresses();
 	if (sd.Execute() == IDOK) {
 		int i = sd.serverlist.GetCursor();
@@ -1121,7 +1161,39 @@ void StartupDialog::SelectServer() {
 	}
 }
 
-void StartupDialog::SelectImage() {
+
+
+
+
+
+
+
+
+
+
+
+
+SettingsDialog::SettingsDialog(Client& cl) : cl(cl) {
+	CtrlLayoutOKCancel(*this, "F2F settings");
+	
+	genderctrl.Add("Female");
+	genderctrl.Add("Male");
+	LoadThis();
+	
+	if (profile_image.IsEmpty() && FileExists(ConfigFile("profile_image_none.png")))
+		profile_image = StreamRaster::LoadFileAny(ConfigFile("profile_image_none.png"));
+	
+	agectrl.SetData(age);
+	genderctrl.SetIndex(gender);
+	image.SetImage(profile_image);
+	namectrl.SetData(name);
+	
+	selectimage <<= THISBACK(SelectImage);
+	
+	namectrl.SetFocus();
+}
+
+void SettingsDialog::SelectImage() {
 	PreviewImage img;
 	FileSel fs;
 	
@@ -1136,9 +1208,28 @@ void StartupDialog::SelectImage() {
 	}
 }
 
-void StartupDialog::Setup() {
+bool SettingsDialog::Setup() {
+	name = namectrl.GetData();
+	age = agectrl.GetData();
+	gender = genderctrl.GetIndex();
+	is_first_start = false;
+	
+	if (profile_image.GetSize() == Size(0,0)) {
+		PromptOK("Profile image is not set");
+		return false;
+	}
+	else if (name.IsEmpty()) {
+		PromptOK("Profile name is empty");
+		return false;
+	}
+	
 	cl.SetName(name);
+	cl.SetAge(age);
+	cl.SetGender(gender);
 	cl.SetImage(profile_image);
+	
+	StoreThis();
+	return true;
 }
 
 
@@ -1150,8 +1241,37 @@ void StartupDialog::Setup() {
 
 
 
+RegisterDialog::RegisterDialog(ServerDialog& sd) : sd(sd) {
+	CtrlLayoutOKCancel(*this, "Register to server");
+}
 
-ServerDialog::ServerDialog(StartupDialog& sd) : sd(sd) {
+RegisterDialog::~RegisterDialog() {
+	
+}
+	
+void RegisterDialog::Register() {
+	Thread::Start(THISBACK(TryRegister));
+}
+
+void RegisterDialog::TryRegister() {
+	if (sd.Connect(false)) {
+		GuiLock __;
+		username.SetData(sd.cl.GetUserId());
+		password.SetData(sd.cl.GetPassword());
+	}
+}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+SelectServerDialog::SelectServerDialog(ServerDialog& sd) : sd(sd) {
 	CtrlLayoutOKCancel(*this, "Select server");
 	
 	serverlist.AddColumn("Title");
@@ -1163,11 +1283,12 @@ ServerDialog::ServerDialog(StartupDialog& sd) : sd(sd) {
 	serverlist.AddIndex();
 	serverlist.AddIndex();
 	serverlist.ColumnWidths("6 2 2 2 3 2");
+	serverlist.WhenLeftDouble << Proxy(ok.WhenAction);
 	
 	Thread::Start(THISBACK(RefreshAddresses));
 }
 
-void ServerDialog::RefreshAddresses() {
+void SelectServerDialog::RefreshAddresses() {
 	Print("Getting server list from the master server");
 	
 	servers.Clear();
@@ -1212,7 +1333,7 @@ void ServerDialog::RefreshAddresses() {
 		Thread::Start(THISBACK1(TestConnection, i));
 }
 
-void ServerDialog::TestConnection(int i) {
+void SelectServerDialog::TestConnection(int i) {
 	Server& server = servers[i];
 	TcpSocket& sock = socks[i];
 	
@@ -1250,7 +1371,7 @@ void ServerDialog::TestConnection(int i) {
 	running--;
 }
 
-void ServerDialog::Data() {
+void SelectServerDialog::Data() {
 	for(int i = 0; i < servers.GetCount(); i++) {
 		const Server& s = servers[i];
 		serverlist.Set(i, 0, s.greeting);

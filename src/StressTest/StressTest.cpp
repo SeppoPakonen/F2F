@@ -69,6 +69,8 @@ void Client::Run() {
 									RefreshChannellist();
 									RefreshUserlist();
 									Set("profile_image", RandomImage());
+									Set("age", IntStr(18 + Random(100)));
+									Set("gender", IntStr(Random(2)));
 									logged_in = true;
 									break;
 					case 301:		Set("name", RandomName()); break;
@@ -161,6 +163,9 @@ void Client::Login() {
 	
 	int name_len = in.Get32();
 	user_name = in.Get(name_len);
+	
+	age = in.Get32();
+	gender = in.Get32();
 	
 	Print("Client " + IntStr(id) + " logged in (" + IntStr(user_id) + ", " + pass + ") nick: " + user_name);
 }
@@ -429,6 +434,8 @@ void Client::RefreshUserlist() {
 		u.user_id = user_id;
 		u.name = name;
 		if (u.name.GetCount() != name_len) fail = true;
+		in.Get(&u.age, sizeof(int));
+		in.Get(&u.gender, sizeof(int));
 		in.Get(&u.profile_img_hash, sizeof(int));
 		in.Get(&u.longitude, sizeof(double));
 		in.Get(&u.latitude, sizeof(double));
