@@ -337,8 +337,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private int age = 0;
     private boolean gender = false;
     private boolean is_logged_in = false;
-    private DataInputStream input;
-    private DataOutputStream output;
+    private InputStream input;
+    private OutputStream output;
     private Lock call_lock, lock;
 
     void StoreThis() {
@@ -379,10 +379,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Log.i(TAG, "Connecting " + addr + ":" + Integer.toString(port));
                 sock = new Socket(addr, port);
 
-                input = new DataInputStream(this.sock.getInputStream());
-                output = new DataOutputStream (this.sock.getOutputStream());
+                input = this.sock.getInputStream();
+                output = this.sock.getOutputStream();
 
-                output.writeInt(-1);
+                ByteBuffer bb = ByteBuffer.allocate(4);
+                bb.putInt(Swap(-1));
+                bb.position(0);
+                while (bb.hasRemaining())
+                    output.write(bb.get());
             }
             catch (UnknownHostException e1) {
                 Log.w(TAG, "Couldn't resolve host");
@@ -484,7 +488,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             } else {
                 if (hash != Hash(imgstr)) {
                     try {
-                        Set("profile_image", imgstr);
+                        Set("profile_image", android.util.Base64.encodeToString(imgstr.getBytes(), android.util.Base64.DEFAULT));
                     }
                     catch (Exc e) {
                         Log.e(TAG, "Changing profile image failed");
@@ -567,7 +571,27 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     int Swap(int i) {
-        return i<<24 | i>>8 & 0xff00 | i<<8 & 0xff0000 | i>>>24;
+        //return i<<24 | i>>8 & 0xff00 | i<<8 & 0xff0000 | i>>>24;
+        return ByteBuffer.allocate(4)
+                .order(ByteOrder.BIG_ENDIAN).putInt(i)
+                .order(ByteOrder.LITTLE_ENDIAN).getInt(0);
+    }
+
+    public static double SwapDouble(double x) {
+        return ByteBuffer.allocate(8)
+                .order(ByteOrder.BIG_ENDIAN).putDouble(x)
+                .order(ByteOrder.LITTLE_ENDIAN).getDouble(0);
+    }
+
+    private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
     }
 
     DataInputStream Call(String out_data) throws Exc {
@@ -575,15 +599,26 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         call_lock.lock();
         try {
-            while (input.available() > 0) input.readByte();
-
             sock.setSoTimeout(30000);
             sock.setKeepAlive(true);
-            int len = out_data.length();
-            output.writeInt(Swap(len));
-            output.writeBytes(out_data);
 
-            int in_size = Swap(input.readInt());
+
+            ByteBuffer bb = ByteBuffer.allocate(4);
+            bb.putInt(Swap(out_data.length()));
+            bb.position(0);
+            for(int i = 0; i < 4; i++)
+                output.write(bb.get());
+
+            output.write(out_data.getBytes());
+            Log.i(TAG, bytesToHex(out_data.getBytes()));
+
+            bb.position(0);
+            for(int i = 0; i < 4; i++)
+                bb.put((byte)input.read());
+            bb.position(0);
+            int in_size = Swap(bb.getInt());
+            if (in_size < 0 || in_size > 10000000)
+                throw new SocketException();
             byte[] in_buf = new byte[in_size];
             input.read(in_buf, 0, in_size);
             in_data = new String(in_buf);
@@ -613,14 +648,21 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         return hash & 0x00000000ffffffffL;
     }
 
+    void WriteInt(ByteArrayOutputStream out, int i) {
+        out.write((i >> 24) & 0xFF);
+        out.write((i >> 16) & 0xFF);
+        out.write((i >> 8) & 0xFF);
+        out.write(i & 0xFF);
+    }
+
     void Register() throws Exc {
         try {
-            ByteArrayOutputStream dout = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(dout);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-            out.writeInt(Swap(10));
+            WriteInt(out, Swap(10));
+            out.write("testitestitesti".getBytes());
 
-            DataInputStream in = Call(new String(dout.toByteArray()));
+            DataInputStream in = Call(new String(out.toByteArray()));
 
             user_id = Swap(in.readInt());
             byte[] pass_bytes = new byte[8];
@@ -636,14 +678,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     void Login() throws Exc {
         try {
-            ByteArrayOutputStream dout = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(dout);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-            out.writeInt(Swap(12));
-            out.writeInt(Swap(user_id));
-            out.writeBytes(pass);
+            WriteInt(out, Swap(20));
+            WriteInt(out, Swap(user_id));
+            out.write(pass.getBytes());
 
-            DataInputStream in = Call(new String(dout.toByteArray()));
+            DataInputStream in = Call(new String(out.toByteArray()));
 
             int ret = Swap(in.readInt());
 
@@ -666,9 +707,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             out.writeInt(Swap(30));
             out.writeInt(Swap(key.length()));
-            out.writeBytes(key);
+            out.write(key.getBytes());
             out.writeInt(Swap(value.length()));
-            out.writeBytes(value);
+            out.write(value.getBytes());
 
             DataInputStream in = Call(new String(dout.toByteArray()));
 
@@ -692,11 +733,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             out.writeInt(Swap(40));
             out.writeInt(Swap(key.length()));
-            out.writeBytes(key);
+            out.write(key.getBytes());
 
             DataInputStream in = Call(new String(dout.toByteArray()));
 
             int value_len = Swap(in.readInt());
+            if (value_len < 0 || value_len > 10000000) {
+                Log.e(TAG, "Get; Invalid length");
+                return "";
+            }
             byte[] value_bytes = new byte[value_len];
             in.read(value_bytes);
             String value = new String(value_bytes);
@@ -809,7 +854,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 int message_len = Swap(in.readInt());
                 if (message_len < 0 ||message_len > 1000000) {
                     Log.e(TAG, "Invalid message");
-                    continue;
+                    break;
                 }
                 byte[] message_bytes = new byte[message_len];
                 in.read(message_bytes);
@@ -823,12 +868,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Log.i(TAG, "Poll " + Integer.toString(i) + ": " + key);
 
                 if (key.equals("msg")) {
+                    if (!users.containsKey(user_id)) continue;
                     String ch_name = "user" + Integer.toString(sender_id);
                     User u = users.get(sender_id);
                     if (!my_channels.contains(ch_name)) my_channels.add(ch_name);
-                    Channel ch;
-                    if (channels.containsKey(ch_name)) ch = channels.get(ch_name);
-                    else ch = channels.put(ch_name, new Channel());
+                    if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                    Channel ch = channels.get(ch_name);
                     if (!ch.userlist.contains(sender_id)) ch.userlist.add(sender_id);
                     ch.Post(sender_id, u.name, message);
                     PostRefreshGui();
@@ -912,7 +957,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (j == -1) continue;
                     String user_id_str = message.substring(0, j);
                     int user_id = Integer.parseInt(user_id_str);
-                    message = message.substring(j+1);
+                    message = new String(android.util.Base64.decode(message.substring(j+1), android.util.Base64.DEFAULT));
                     StoreImageCache(message);
                     if (users.containsKey(user_id)) {
                         User u = users.get(user_id);
@@ -960,9 +1005,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             out.writeInt(Swap(90));
 
-            out.writeDouble(l.getLatitude());
-            out.writeDouble(l.getLongitude());
-            out.writeDouble(l.getAltitude());
+            out.writeDouble(SwapDouble(l.getLatitude()));
+            out.writeDouble(SwapDouble(l.getLongitude()));
+            out.writeDouble(SwapDouble(l.getAltitude()));
 
             DataInputStream in = Call(new String(dout.toByteArray()));
 
@@ -1047,6 +1092,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             boolean success = true;
             int user_id = Swap(in.readInt());
             int name_len = Swap(in.readInt());
+            if (name_len < 0 || name_len > 200)
+                return false;
             byte[] name_bytes = new byte[name_len];
             in.read(name_bytes);
             String name = new String(name_bytes);
@@ -1060,9 +1107,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             u.profile_image_hash = Swap(in.readInt()) & 0x00000000ffffffffL;
 
-            u.l.setLongitude(in.readDouble());
-            u.l.setLatitude(in.readDouble());
-            u.l.setAltitude(in.readDouble());
+            u.l.setLongitude(SwapDouble(in.readDouble()));
+            u.l.setLatitude(SwapDouble(in.readDouble()));
+            u.l.setAltitude(SwapDouble(in.readDouble()));
 
             int channel_count = Swap(in.readInt());
             if (channel_count < 0 || channel_count > 200)
@@ -1092,7 +1139,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             int user_count = Swap(in.readInt());
             boolean fail = false;
-            for(int i = 0; i < user_count; i++) {
+            for(int i = 0; i < user_count && !fail; i++) {
                 fail |= !Who(in);
             }
             if (fail) throw new Exc("Getting userlist failed");
