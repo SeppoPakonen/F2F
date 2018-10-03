@@ -303,7 +303,7 @@ void Client::Call(Stream& out, Stream& in) {
 void Client::Register() {
 	StringStream out, in;
 	
-	out.Put32(100);
+	out.Put32(10);
 	
 	Call(out, in);
 	
@@ -317,7 +317,7 @@ void Client::Register() {
 void Client::Login() {
 	StringStream out, in;
 	
-	out.Put32(200);
+	out.Put32(20);
 	out.Put32(user_id);
 	out.Put(pass.Begin(), pass.GetCount());
 	
@@ -338,7 +338,7 @@ void Client::Login() {
 bool Client::Set(const String& key, const String& value) {
 	StringStream out, in;
 	
-	out.Put32(300);
+	out.Put32(30);
 	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
@@ -361,7 +361,7 @@ bool Client::Set(const String& key, const String& value) {
 void Client::Get(const String& key, String& value) {
 	StringStream out, in;
 	
-	out.Put32(400);
+	out.Put32(40);
 	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
@@ -382,7 +382,7 @@ void Client::Join(String channel) {
 	if (channel.IsEmpty()) return;
 	StringStream out, in;
 	
-	out.Put32(500);
+	out.Put32(50);
 	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
@@ -409,7 +409,7 @@ void Client::Leave(String channel) {
 	if (channel.IsEmpty()) return;
 	StringStream out, in;
 	
-	out.Put32(600);
+	out.Put32(60);
 	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
@@ -430,7 +430,7 @@ void Client::Message(int recv_user_id, const String& msg) {
 	if (recv_user_id < 0) return;
 	StringStream out, in;
 	
-	out.Put32(700);
+	out.Put32(70);
 	
 	out.Put32(recv_user_id);
 	out.Put32(msg.GetCount());
@@ -447,7 +447,7 @@ void Client::Message(int recv_user_id, const String& msg) {
 void Client::Poll() {
 	StringStream out, in;
 	
-	out.Put32(800);
+	out.Put32(80);
 	
 	Call(out, in);
 	
@@ -625,7 +625,7 @@ void Client::ChangeLocation(Pointf coord) {
 void Client::SendLocation(const Location& l) {
 	StringStream out, in;
 	
-	out.Put32(900);
+	out.Put32(90);
 	
 	out.Put(&l.latitude, sizeof(l.latitude));
 	out.Put(&l.longitude, sizeof(l.longitude));
@@ -643,7 +643,7 @@ void Client::SendChannelMessage(String channel, const String& msg) {
 	if (channel.IsEmpty()) return;
 	StringStream out, in;
 	
-	out.Put32(1000);
+	out.Put32(100);
 	
 	out.Put32(channel.GetCount());
 	out.Put(channel.Begin(), channel.GetCount());

@@ -289,22 +289,24 @@ void ActiveSession::Run() {
 			StringStream out;
 			
 			int code;
+			int test = SwapEndian32(-939524096);
 			r = in.Get(&code, sizeof(code));
 			if (r != sizeof(code)) throw Exc("Received invalid code");
 			
 			if (code > 200 && user_id == -1) throw Exc("Not logged in");
 			
 			switch (code) {
-				case 100:		Register(in, out); break;
-				case 200:		Login(in, out); break;
-				case 300:		Set(in, out); break;
-				case 400:		Get(in, out); break;
-				case 500:		Join(in, out); break;
-				case 600:		Leave(in, out); break;
-				case 700:		Message(in, out); break;
-				case 800:		Poll(in, out); break;
-				case 900:		Location(in, out); break;
-				case 1000:		ChannelMessage(in, out); break;
+				case 10:		Register(in, out); break;
+				case 12:
+				case 20:		Login(in, out); break;
+				case 30:		Set(in, out); break;
+				case 40:		Get(in, out); break;
+				case 50:		Join(in, out); break;
+				case 60:		Leave(in, out); break;
+				case 70:		Message(in, out); break;
+				case 80:		Poll(in, out); break;
+				case 90:		Location(in, out); break;
+				case 100:		ChannelMessage(in, out); break;
 				
 				default:
 					throw Exc("Received invalid code " + IntStr(code));
