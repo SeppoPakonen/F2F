@@ -1,12 +1,19 @@
 package fi.zzz.f2f;
 
+import android.Manifest;
+import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.Image;
 import android.preference.PreferenceManager;
+import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
@@ -18,6 +25,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBar;
@@ -46,11 +54,18 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,115 +81,10 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.concurrent.locks.ReentrantLock;
+
 import static java.nio.charset.StandardCharsets.*;
-
-class OpenSslAes {
-
-    /** OpenSSL's magic initial bytes. */
-    private static final String SALTED_STR = "Salted__";
-    private static final byte[] SALTED_MAGIC = SALTED_STR.getBytes();
-
-
-
-    /**
-     *
-     * @param password  The password / key to encrypt with.
-     * @param clearText The data to encrypt
-     * @return  A base64 encoded string containing the encrypted data.
-     */
-    static String encrypt(String password, String clearText) {
-        try {
-            final byte[] pass = password.getBytes();
-            final byte[] salt = (new SecureRandom()).generateSeed(8);
-            final byte[] inBytes = clearText.getBytes();
-
-            final byte[] passAndSalt = array_concat(pass, salt);
-            byte[] hash = new byte[0];
-            byte[] keyAndIv = new byte[0];
-            for (int i = 0; i < 3 && keyAndIv.length < 48; i++) {
-                final byte[] hashData = array_concat(hash, passAndSalt);
-                final MessageDigest md = MessageDigest.getInstance("MD5");
-                hash = md.digest(hashData);
-                keyAndIv = array_concat(keyAndIv, hash);
-            }
-
-            final byte[] keyValue = Arrays.copyOfRange(keyAndIv, 0, 32);
-            final byte[] iv = Arrays.copyOfRange(keyAndIv, 32, 48);
-            final SecretKeySpec key = new SecretKeySpec(keyValue, "AES");
-
-            final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
-            byte[] data = cipher.doFinal(inBytes);
-            data = array_concat(array_concat(SALTED_MAGIC, salt), data);
-            return Base64.getEncoder().encodeToString(data);
-        }
-        catch (NoSuchAlgorithmException e) {}
-        catch (InvalidAlgorithmParameterException e) {}
-        catch (BadPaddingException e) {}
-        catch (NoSuchPaddingException e) {}
-        catch (InvalidKeyException e) {}
-        catch (IllegalBlockSizeException e) {}
-        return "";
-    }
-
-    /**
-     * @see http://stackoverflow.com/questions/32508961/java-equivalent-of-an-openssl-aes-cbc-encryption  for what looks like a useful answer.  The not-yet-commons-ssl also has an implementation
-     * @param password
-     * @param source The encrypted data
-     * @return
-     */
-    static String decrypt(String password, String source) {
-        try {
-            final byte[] pass = password.getBytes(US_ASCII);
-
-            final byte[] inBytes = Base64.getDecoder().decode(source);
-
-            final byte[] shouldBeMagic = Arrays.copyOfRange(inBytes, 0, SALTED_MAGIC.length);
-            if (!Arrays.equals(shouldBeMagic, SALTED_MAGIC)) {
-                throw new IllegalArgumentException("Initial bytes from input do not match OpenSSL SALTED_MAGIC salt value.");
-            }
-
-            final byte[] salt = Arrays.copyOfRange(inBytes, SALTED_MAGIC.length, SALTED_MAGIC.length + 8);
-
-            final byte[] passAndSalt = array_concat(pass, salt);
-
-            byte[] hash = new byte[0];
-            byte[] keyAndIv = new byte[0];
-            for (int i = 0; i < 3 && keyAndIv.length < 48; i++) {
-                final byte[] hashData = array_concat(hash, passAndSalt);
-                final MessageDigest md = MessageDigest.getInstance("MD5");
-                hash = md.digest(hashData);
-                keyAndIv = array_concat(keyAndIv, hash);
-            }
-
-            final byte[] keyValue = Arrays.copyOfRange(keyAndIv, 0, 32);
-            final SecretKeySpec key = new SecretKeySpec(keyValue, "AES");
-
-            final byte[] iv = Arrays.copyOfRange(keyAndIv, 32, 48);
-
-            final Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
-            final byte[] clear = cipher.doFinal(inBytes, 16, inBytes.length - 16);
-            return new String(clear, UTF_8);
-        }
-        catch (NoSuchAlgorithmException e) {}
-        catch (InvalidAlgorithmParameterException e) {}
-        catch (BadPaddingException e) {}
-        catch (NoSuchPaddingException e) {}
-        catch (InvalidKeyException e) {}
-        catch (IllegalBlockSizeException e) {}
-        return "";
-    }
-
-
-    private static byte[] array_concat(final byte[] a, final byte[] b) {
-        final byte[] c = new byte[a.length + b.length];
-        System.arraycopy(a, 0, c, 0, a.length);
-        System.arraycopy(b, 0, c, a.length, b.length);
-        return c;
-    }
-}
-
+import static java.security.AccessController.getContext;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -183,9 +93,19 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final String TAG = "F2F";
 
+    private static final int REQUEST_PERMISSION_LOCATION = 255; // int should be between 0 and 255
+
     public enum Preferencies {
         COMPLETED_ONBOARDING_PREF_NAME
     };
+
+    MapsActivity() {
+        call_lock = new ReentrantLock();
+        lock = new ReentrantLock();
+        channels = new HashMap<String, Channel>();
+        users = new HashMap<Integer, User>();
+        my_channels = new HashSet<String>();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -235,12 +155,85 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 // The user hasn't seen the OnboardingFragment yet, so show it
                 startActivity(new Intent(this, OnboardingActivity.class));
             }*/
+            Thread thread = new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        addr = "192.168.1.106";
+                        port = 17000;
+                        Connect();
+                        RegisterScript();
+                        LoginScript();
+                        HandleConnection();
+                    }
+                    catch (Exc e) {
+                        Log.e(TAG, "Error: " + e.msg);
+                        System.exit(1);
+                    }
+                }
+            };
+            thread.start();
+
+
+
+            // Ask location permissions
+            if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
+            }
+            else {
+                StartLocationService();
+            }
+
 
         }
         catch (java.lang.NullPointerException e) {
             Log.e(TAG, "System error");
             System.exit(1);
         }
+
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_PERMISSION_LOCATION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // We now have permission to use the location
+                StartLocationService();
+            }
+        }
+    }
+
+    void StartLocationService() {
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        // Define a listener that responds to location updates
+        LocationListener locationListener = new LocationListener() {
+            public void onLocationChanged(final Location location) {
+                // Called when a new location is found by the network location provider.
+                Thread thread = new Thread() {
+                    @Override
+                    public void run() {
+                        try {
+                            SendLocation(location);
+                        }
+                        catch (Exc e) {
+                            Log.e(TAG, "Location changing failed: " + e.msg);
+                        }
+                    }
+                };
+                thread.start();
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            public void onProviderEnabled(String provider) {}
+
+            public void onProviderDisabled(String provider) {}
+        };
+
+        // Register the listener with the Location Manager to receive location updates
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
     }
 
 
@@ -278,11 +271,48 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     class User {
+        public int user_id = -1;
+        public String name = "";
+        public boolean is_updated = false;
+        public Date last_update;
 
+        public HashSet<String> channels;
+        public Location l;
+        public long profile_image_hash = 0;
+        public int age = 0;
+        public boolean gender = true;
+        public Bitmap profile_image;
+
+        User() {
+            channels = new HashSet<String>();
+            l = new Location("");
+            last_update = new Date(1970,1,1);
+        }
+    }
+
+    class ChannelMessage {
+        int sender_id = -1;
+        String message = "", sender_name = "";
+        Date received;
     }
 
     class Channel {
+        List<ChannelMessage> messages;
+        HashSet<Integer> userlist;
+        int unread = 0;
 
+        Channel() {
+            messages = new ArrayList<ChannelMessage>();
+            userlist = new HashSet<Integer>();
+        }
+        void Post(int user_id, String user_name, String msg) {
+            ChannelMessage m = new ChannelMessage();
+            m.received = Calendar.getInstance().getTime();
+            m.message = msg;
+            m.sender_id = user_id;
+            m.sender_name = user_name;
+            messages.add(m);
+        }
     }
 
     class Exc extends Throwable {
@@ -295,12 +325,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private String pass;
     private boolean is_registered = false;
 
-    private Map<String, Channel> channels;
-    private Map<Integer, User> users;
-    private Map<Long, Bitmap> image_cache;
-    private Set<String> my_channels;
+    private HashMap<String, Channel> channels;
+    private HashMap<Integer, User> users;
+    private HashMap<Long, Bitmap> image_cache;
+    private HashSet<String> my_channels;
     private String user_name;
     private String addr;
+    private String active_channel = "";
     private Socket sock;
     private int port = 17000;
     private int age = 0;
@@ -331,11 +362,21 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
+    void PostRefreshGuiChannel() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                RefreshGuiChannel();
+            }
+        });
+    }
+
     boolean Connect() {
         if (sock == null || sock.isClosed()) {
             is_logged_in = false;
 
             try {
+                Log.i(TAG, "Connecting " + addr + ":" + Integer.toString(port));
                 sock = new Socket(addr, port);
 
                 input = new DataInputStream(this.sock.getInputStream());
@@ -355,7 +396,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         return true;
     }
 
-    boolean LoginScript() throws Exc {
+    boolean RegisterScript() throws Exc {
         if (!is_registered) {
             try {
                 Register();
@@ -369,7 +410,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         return true;
     }
 
-    boolean RegisterScript() throws Exc {
+    boolean LoginScript() throws Exc {
         if (!is_logged_in) {
             lock.lock();
             users.clear();
@@ -380,7 +421,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Login();
                 RefreshChannellist();
                 RefreshUserlist();
-                RefreshLocation();
                 is_logged_in = true;
                 PostRefreshGui();
             }
@@ -428,7 +468,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         long hash = 0;
         try {
             String hash_str = Get("profile_image_hash");
-            hash = Long.valueOf(hash_str);
+            hash = Long.parseLong(hash_str);
         }
         catch (Exc e) {
             Log.e(TAG, "Getting existing image hash failed");
@@ -436,7 +476,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         while (true) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             i.compress(Bitmap.CompressFormat.JPEG, 80, out);
-            String imgstr = out.toByteArray().toString();
+            String imgstr = new String(out.toByteArray());
             if (imgstr.length() > 100000) {
                 int nw = i.getWidth() / 2;
                 int nh = i.getHeight() / 2;
@@ -479,10 +519,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     String LoadCachedImage(long hash) {
         String img_file = getApplicationContext().getFilesDir() + "/" + Long.toString(hash) + ".bin";
-        //Bitmap bm = BitmapFactory.decodeFile(img_file);
         try {
+            long size = new File(img_file).length();
+            byte[] data = new byte[(int)size];
             FileInputStream fin = new FileInputStream(img_file);
-            return fin.toString();
+            fin.read(data);
+            return new String(data);
         }
         catch (FileNotFoundException f) {
             Log.e(TAG, "File not found: " + img_file);
@@ -501,7 +543,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             Connect();
 
             try {
-                while (Thread.interrupted() && sock.isConnected()) {
+                while (!Thread.interrupted() && sock.isConnected()) {
                     RegisterScript();
                     LoginScript();
 
@@ -518,32 +560,39 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (IOException e) {}
 
             is_logged_in = false;
+            sock = null;
         }
 
         Log.i(TAG, "Client connection stopped");
     }
 
-    ByteArrayInputStream Call(OutputStream out) throws Exc {
-        String out_data = OpenSslAes.encrypt("passw0rdpassw0rd", out.toString());
+    int Swap(int i) {
+        return i<<24 | i>>8 & 0xff00 | i<<8 & 0xff0000 | i>>>24;
+    }
+
+    DataInputStream Call(String out_data) throws Exc {
         String in_data;
 
         call_lock.lock();
         try {
+            while (input.available() > 0) input.readByte();
+
             sock.setSoTimeout(30000);
-            output.writeInt(out_data.length());
+            sock.setKeepAlive(true);
+            int len = out_data.length();
+            output.writeInt(Swap(len));
             output.writeBytes(out_data);
 
-            int in_size = input.readInt();
+            int in_size = Swap(input.readInt());
             byte[] in_buf = new byte[in_size];
             input.read(in_buf, 0, in_size);
-            in_data = in_buf.toString();
+            in_data = new String(in_buf);
         }
         catch (SocketException e) {call_lock.unlock(); throw new Exc("Call: Socket exception");}
         catch (IOException e) {call_lock.unlock(); throw new Exc("Call: IOException");}
         call_lock.unlock();
 
-        String dec_data = OpenSslAes.decrypt("passw0rdpassw0rd", in_data);
-        return new ByteArrayInputStream(dec_data.getBytes());
+        return new DataInputStream(new ByteArrayInputStream(in_data.getBytes()));
     }
 
     void Sleep(int ms) {
@@ -565,36 +614,530 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     void Register() throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
 
+            out.writeInt(Swap(10));
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            user_id = Swap(in.readInt());
+            byte[] pass_bytes = new byte[8];
+            in.read(pass_bytes);
+            pass = new String(pass_bytes);
+
+            Log.i(TAG, "Client " + Integer.toString(user_id) + " registered (pass " + pass + ")");
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
     }
 
     void Login() throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
 
+            out.writeInt(Swap(12));
+            out.writeInt(Swap(user_id));
+            out.writeBytes(pass);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+
+            int name_len = Swap(in.readInt());
+            byte[] name_bytes = new byte[name_len];
+            in.read(name_bytes);
+            user_name = new String(name_bytes);
+            age = Swap(in.readInt());
+            gender = Swap(in.readInt()) != 0 ? true : false;
+            Log.i(TAG, "Client " + Integer.toString(user_id) + " logged in (" + Integer.toString(user_id) + "," + pass + ") name: " + user_name);
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
     }
-
-    void RefreshChannellist() {
-
-    }
-
-    void RefreshUserlist() {
-
-    }
-
-    void RefreshLocation() {
-
-    }
-
     boolean Set(String key, String value) throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
 
-        return true;
+            out.writeInt(Swap(30));
+            out.writeInt(Swap(key.length()));
+            out.writeBytes(key);
+            out.writeInt(Swap(value.length()));
+            out.writeBytes(value);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+            if (ret == 1) {
+                Log.e(TAG, "Client set " + key + " failed");
+                return false;
+            }
+            Log.i(TAG, "Client set " + key);
+            return true;
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
     }
 
     String Get(String key) throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
 
-        return "";
+            out.writeInt(Swap(40));
+            out.writeInt(Swap(key.length()));
+            out.writeBytes(key);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int value_len = Swap(in.readInt());
+            byte[] value_bytes = new byte[value_len];
+            in.read(value_bytes);
+            String value = new String(value_bytes);
+
+            Log.i(TAG, "Client get " + key);
+            return value;
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
     }
 
-    void Poll() {
+    void Join(String channel) throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
+
+            out.writeInt(Swap(50));
+            out.writeInt(Swap(channel.length()));
+            out.writeBytes(channel);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+            if (ret == 1) {
+                Log.w(TAG, "Client was already joined to channel " + channel);
+                return;
+            }
+            else if (ret != 0) throw new Exc("Joining channel failed)");
+
+            my_channels.add(channel);
+            channels.put(channel, new Channel());
+            PostRefreshGui();
+
+            Log.i(TAG, "Client joined channel " + channel);
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
+    }
+
+    void Leave(String channel) throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
+
+            out.writeInt(Swap(60));
+            out.writeInt(Swap(channel.length()));
+            out.writeBytes(channel);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+            if (ret != 0) throw new Exc("Leaving channel failed)");
+
+            my_channels.remove(channel);
+            PostRefreshGui();
+
+            Log.i(TAG, "Client left channel " + channel);
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
+    }
+
+    void Message(int recv_user_id, String msg) throws Exc {
+        if (recv_user_id < 0) return;
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
+
+            out.writeInt(Swap(70));
+            out.writeInt(Swap(msg.length()));
+            out.writeBytes(msg);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+            if (ret != 0) throw new Exc("Message sending failed)");
+
+            Log.i(TAG, "Message to " + Integer.toString(recv_user_id) + " sent: " + msg);
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
+    }
+
+    class UserJoined {
+        public int user_id;
+        public String channel;
+    }
+
+    void Poll() throws Exc {
+        List<UserJoined> join_list = new ArrayList<UserJoined>();
+
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
+
+            out.writeInt(Swap(80));
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            lock.lock();
+
+            int count = Swap(in.readInt());
+            if (count < 0 || count >= 10000) {lock.unlock(); throw new Exc("Polling failed");}
+            for(int i = 0; i < count; i++) {
+                int sender_id = Swap(in.readInt());
+                int message_len = Swap(in.readInt());
+                if (message_len < 0 ||message_len > 1000000) {
+                    Log.e(TAG, "Invalid message");
+                    continue;
+                }
+                byte[] message_bytes = new byte[message_len];
+                in.read(message_bytes);
+                String message= new String(message_bytes);
+
+                int j = message.indexOf(" ");
+                if (j == -1) continue;
+                String key = message.substring(0, j);
+                message = message.substring(j + 1);
+
+                Log.i(TAG, "Poll " + Integer.toString(i) + ": " + key);
+
+                if (key.equals("msg")) {
+                    String ch_name = "user" + Integer.toString(sender_id);
+                    User u = users.get(sender_id);
+                    if (!my_channels.contains(ch_name)) my_channels.add(ch_name);
+                    Channel ch;
+                    if (channels.containsKey(ch_name)) ch = channels.get(ch_name);
+                    else ch = channels.put(ch_name, new Channel());
+                    if (!ch.userlist.contains(sender_id)) ch.userlist.add(sender_id);
+                    ch.Post(sender_id, u.name, message);
+                    PostRefreshGui();
+                }
+                else if (key.equals("chmsg")) {
+                    if (!users.containsKey(user_id)) continue;
+                    User u = users.get(sender_id);
+                    j = message.indexOf(" ");
+                    String ch_name = message.substring(0, j);
+                    message = message.substring(j + 1);
+                    if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                    Channel ch = channels.get(ch_name);
+                    ch.Post(sender_id, u.name, message);
+                    PostRefreshGui();
+                }
+                else if (key.equals("join")) {
+                    String[] args = message.split(" ");
+                    if (args.length != 2) continue;
+                    int user_id = Integer.parseInt(args[0]);
+                    String ch_name = args[1];
+                    if (!users.containsKey(user_id)) users.put(user_id, new User());
+                    User u = users.get(user_id);
+                    u.user_id = user_id;
+                    u.channels.add(ch_name);
+                    if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                    Channel ch = channels.get(ch_name);
+                    ch.userlist.add(user_id);
+                    UserJoined uj = new UserJoined();
+                    uj.user_id = user_id;
+                    uj.channel = ch_name;
+                    join_list.add(uj);
+                }
+                else if (key.equals("leave")) {
+                    String[] args = message.split(" ");
+                    if (args.length != 2) continue;
+                    int user_id = Integer.parseInt(args[0]);
+                    String ch_name = args[1];
+                    if (!users.containsKey(user_id)) continue;
+                    User u = users.get(user_id);
+                    u.channels.remove(ch_name);
+                    if (!channels.containsKey(ch_name)) continue;
+                    Channel ch = channels.get(ch_name);
+                    ch.userlist.remove(user_id);
+                    ch.Post(-1, "Server", "User " + u.name + " left channel " + ch_name);
+                    if (u.channels.isEmpty())
+                        users.remove(user_id);
+                    PostRefreshGui();
+                }
+                else if (key.equals("name")) {
+                    String[] args = message.split(" ");
+                    if (args.length != 2) continue;
+                    int user_id = Integer.parseInt(args[0]);
+                    String user_name = args[1];
+                    if (!users.containsKey(user_id)) continue;
+                    User u = users.get(user_id);
+                    u.name = user_name;
+                    PostRefreshGui();
+                }
+                else if (key.equals("loc")) {
+                    String[] args = message.split(" ");
+                    if (args.length != 4) continue;
+                    int user_id = Integer.parseInt(args[0]);
+                    double lon = Double.parseDouble(args[1]);
+                    double lat = Double.parseDouble(args[2]);
+                    double elev = Double.parseDouble(args[3]);
+                    if (!users.containsKey(user_id)) continue;
+                    User u = users.get(user_id);
+                    u.last_update = Calendar.getInstance().getTime();
+                    u.l.setLongitude(lon);
+                    u.l.setLatitude(lat);
+                    u.l.setAltitude(elev);
+                    for (String ch_name : u.channels) {
+                        if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                        Channel ch = channels.get(ch_name);
+                        ch.Post(-1, "Server", "User " + u.name + " changed name to " + user_name);
+                    }
+                    PostRefreshGui();
+                }
+                else if (key.equals("profile")) {
+                    j = message.indexOf(" ");
+                    if (j == -1) continue;
+                    String user_id_str = message.substring(0, j);
+                    int user_id = Integer.parseInt(user_id_str);
+                    message = message.substring(j+1);
+                    StoreImageCache(message);
+                    if (users.containsKey(user_id)) {
+                        User u = users.get(user_id);
+                        u.profile_image = BitmapFactory.decodeByteArray(message.getBytes(), 0, message.length());
+                        u.profile_image_hash = Hash(message);
+                        for (String ch_name : u.channels) {
+                            if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                            Channel ch = channels.get(ch_name);
+                            ch.Post(-1, "Server", "User " + u.name + " updated profile image");
+                        }
+                    }
+                    PostRefreshGui();
+                }
+            }
+        }
+        catch (IOException e) {
+
+        }
+        lock.unlock();
+
+        if (!join_list.isEmpty()) {
+
+            for (UserJoined uj : join_list) {
+
+                String who = Get("who " + Integer.toString(uj.user_id));
+                DataInputStream in = new DataInputStream(new ByteArrayInputStream(who.getBytes()));
+                Who(in);
+
+                User u = users.get(uj.user_id);
+                RefreshUserImage(u);
+
+                if (!channels.containsKey(uj.channel)) continue;
+                Channel ch = channels.get(uj.channel);
+                ch.Post(-1, "Server", "User " + u.name + " joined channel " + uj.channel);
+            }
+
+            PostRefreshGui();
+        }
+    }
+
+    void SendLocation(Location l) throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
+
+            out.writeInt(Swap(90));
+
+            out.writeDouble(l.getLatitude());
+            out.writeDouble(l.getLongitude());
+            out.writeDouble(l.getAltitude());
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+            if (ret != 0) throw new Exc("Updating location failed)");
+
+            Log.i(TAG, "Client updated location ");
+        }
+        catch (IOException e) {
+            throw new Exc("SendLocation: IOException");
+        }
+        catch (NullPointerException e) {
+            throw new Exc("SendLocation: not connected yet");
+        }
+    }
+
+    void SendChannelMessage(String channel, String msg) throws Exc {
+        try {
+            ByteArrayOutputStream dout = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(dout);
+
+            out.writeInt(Swap(100));
+
+            out.writeInt(Swap(channel.length()));
+            out.writeBytes(channel);
+            out.writeInt(Swap(msg.length()));
+            out.writeBytes(msg);
+
+            DataInputStream in = Call(new String(dout.toByteArray()));
+
+            int ret = Swap(in.readInt());
+            if (ret != 0) throw new Exc("Message sending failed)");
+
+            Log.i(TAG, "Client sent to channel " + channel + " message " + msg);
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
+    }
+
+    void RefreshChannellist() throws Exc {
+        try {
+            String channellist_str = Get("channellist");
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(channellist_str.getBytes()));
+
+            HashSet<String> ch_rem = new HashSet<String>();
+            for (String ch_name : my_channels) ch_rem.add(ch_name);
+
+            int ch_count = Swap(in.readInt());
+            boolean fail = false;
+            for (int i = 0; i < ch_count; i++) {
+                int name_len = Swap(in.readInt());
+                if (name_len <= 0) continue;
+                byte[] name_bytes = new byte[name_len];
+                in.read(name_bytes);
+                String name = new String(name_bytes);
+
+                if (ch_rem.contains(name)) ch_rem.remove(name);
+
+                if (!my_channels.contains(name)) my_channels.add(name);
+                if (!channels.containsKey(name)) channels.put(name, new Channel());
+            }
+            if (fail) throw new Exc("Getting channel-list failed");
+
+            for (String ch : ch_rem)
+                my_channels.remove(ch);
+
+            if (!my_channels.isEmpty() && active_channel.isEmpty()) {
+                SetActiveChannel(my_channels.iterator().next());
+                PostRefreshGuiChannel();
+            }
+
+            Log.i(TAG, "Client updated channel-list");
+        }
+        catch (IOException e) {
+            throw new Exc("Register: IOException");
+        }
+    }
+
+    boolean Who(DataInputStream in) {
+        try {
+            boolean success = true;
+            int user_id = Swap(in.readInt());
+            int name_len = Swap(in.readInt());
+            byte[] name_bytes = new byte[name_len];
+            in.read(name_bytes);
+            String name = new String(name_bytes);
+
+            if (!users.containsKey(user_id)) users.put(user_id, new User());
+            User u = users.get(user_id);
+            u.user_id = user_id;
+            u.name = name;
+            u.age = Swap(in.readInt());
+            u.gender = Swap(in.readInt()) != 0 ? true : false;
+
+            u.profile_image_hash = Swap(in.readInt()) & 0x00000000ffffffffL;
+
+            u.l.setLongitude(in.readDouble());
+            u.l.setLatitude(in.readDouble());
+            u.l.setAltitude(in.readDouble());
+
+            int channel_count = Swap(in.readInt());
+            if (channel_count < 0 || channel_count > 200)
+                return false;
+            for (int j = 0; j < channel_count; j++) {
+                int ch_name_len = Swap(in.readInt());
+                byte[] ch_name_bytes = new byte[ch_name_len];
+                in.read(ch_name_bytes);
+                String ch_name = new String(ch_name_bytes);
+                if (!u.channels.contains(ch_name)) u.channels.add(ch_name);
+                if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                Channel ch = channels.get(ch_name);
+                if (!ch.userlist.contains(user_id)) ch.userlist.add(user_id);
+            }
+
+            return true;
+        }
+        catch (IOException e) {
+            return false;
+        }
+    }
+
+    void RefreshUserlist() {
+        try {
+            String userlist_str = Get("userlist");
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(userlist_str.getBytes()));
+
+            int user_count = Swap(in.readInt());
+            boolean fail = false;
+            for(int i = 0; i < user_count; i++) {
+                fail |= !Who(in);
+            }
+            if (fail) throw new Exc("Getting userlist failed");
+
+            for (User u : users.values())
+                RefreshUserImage(u);
+
+            Log.i(TAG, "Client updated userlist");
+        }
+        catch (Exc e) {
+            Log.e(TAG, "Refreshing userlist failed: " + e.msg);
+        }
+        catch (IOException e) {
+            Log.e(TAG, "Refreshing userlist failed: IOException");
+        }
+    }
+
+    void RefreshUserImage(User u) {
+        try {
+            String image_str;
+
+            if (!HasCachedImage(u.profile_image_hash)) {
+                // Fetch image
+                image_str = Get("image " + Long.toString(u.profile_image_hash));
+
+                // Store to hard drive
+                StoreImageCache(image_str);
+
+            } else {
+                image_str = LoadCachedImage(u.profile_image_hash);
+            }
+
+            // Load to memory
+            u.profile_image = BitmapFactory.decodeByteArray(image_str.getBytes(), 0, image_str.length());
+        }
+        catch (Exc e) {
+            Log.e(TAG, "User image refresh failed: " + u.name);
+        }
+    }
+
+    void RefreshGuiChannel() {
+
+    }
+
+    void SetActiveChannel(String s) {
 
     }
 }
