@@ -1,5 +1,4 @@
 #include "StressTest.h"
-#include "AES.h"
 
 void Print(const String& s) {
 	static Mutex lock;
@@ -106,19 +105,14 @@ void Client::Run() {
 void Client::Call(Stream& out, Stream& in) {
 	int r;
 	
-	AESEncoderStream enc(10000000, "passw0rdpassw0rd");
 	out.Seek(0);
 	String out_str = out.Get(out.GetSize());
-	if (out_str.GetCount() % AES_BLOCK_SIZE != 0)
-		out_str.Cat(0, AES_BLOCK_SIZE - (out_str.GetCount() % AES_BLOCK_SIZE));
-	enc.AddData(out_str);
-	String out_data = enc.GetEncryptedData();
-	int out_size = out_data.GetCount();
+	int out_size = out_str.GetCount();
 	
 	r = s->Put(&out_size, sizeof(out_size));
 	if (r != sizeof(out_size)) throw Exc("Data sending failed");
-	r = s->Put(out_data.Begin(), out_data.GetCount());
-	if (r != out_data.GetCount()) throw Exc("Data sending failed");
+	r = s->Put(out_str.Begin(), out_str.GetCount());
+	if (r != out_str.GetCount()) throw Exc("Data sending failed");
 	
 	s->Timeout(30000);
 	int in_size;
@@ -128,10 +122,8 @@ void Client::Call(Stream& out, Stream& in) {
 	String in_data = s->Get(in_size);
 	if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
 	
-	AESDecoderStream dec("passw0rdpassw0rd");
-	dec.AddData(in_data);
 	int64 pos = in.GetPos();
-	in << dec.GetDecryptedData();
+	in << in_data;
 	in.Seek(pos);
 }
 

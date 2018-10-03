@@ -11,9 +11,7 @@ library(POSIX) "ssl crypto";
 
 file
 	StressTest.h,
-	StressTest.cpp,
-	AES.h,
-	AES.cpp;
+	StressTest.cpp;
 
 mainconfig
 	"" = "";

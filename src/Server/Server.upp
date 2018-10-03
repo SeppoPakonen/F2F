@@ -8,9 +8,7 @@ library(POSIX) "ssl crypto";
 file
 	Server.h,
 	Server.cpp,
-	Database.cpp,
-	AES.h,
-	AES.cpp;
+	Database.cpp;
 
 mainconfig
 	"" = "",

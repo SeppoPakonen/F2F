@@ -17,9 +17,7 @@ file
 	GoogleMaps.cpp,
 	GoogleMaps.lay,
 	GoogleMaps.iml,
-	MapDlg.cpp,
-	AES.h,
-	AES.cpp;
+	MapDlg.cpp;
 
 mainconfig
 	"" = "GUI";
