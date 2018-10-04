@@ -6,6 +6,8 @@ UserDatabase& GetDatabase(int user_id) {
 	static SpinLock lock;
 	lock.Enter();
 	UserDatabase& db = dbs.GetAdd(user_id);
+	if (!db.IsOpen())
+		db.Init(user_id);
 	lock.Leave();
 	return db;
 }
@@ -37,13 +39,16 @@ int UserDatabase::Init(int user_id) {
 		return 1;
 	}
 	
+	open = true;
 	lock.Leave();
 	return 0;
 }
 
 void UserDatabase::Deinit() {
+	Flush();
 	lock.Enter();
 	location.Close();
+	open = false;
 	lock.Leave();
 }
 

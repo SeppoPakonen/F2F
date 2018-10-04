@@ -49,16 +49,17 @@ void Client::Run() {
 					action = 200;
 				}
 				else {
-					switch (Random(9)) {
+					switch (Random(10)) {
 						case 0:	action = 301;	break;
 						case 1:	action = 400;	break;
-						case 2:	action = 500;	break;
-						case 3:	action = 600;	break;
-						case 4:	action = 700;	break;
-						case 5:	action = 800;	break;
-						case 6:	action = 900;	break;
-						case 7:	action = 1000;	break;
-						case 8:	action = 302;	break;
+						case 2:
+						case 3:	action = 500;	break;
+						case 4:	action = 600;	break;
+						case 5:	action = 700;	break;
+						case 6:	action = 800;	break;
+						case 7:	action = 900;	break;
+						case 8:	action = 1000;	break;
+						case 9:	action = 302;	break;
 					}
 				}
 				
@@ -450,7 +451,7 @@ String Client::RandomImage() {
 	ImageBuffer img(128, 128);
 	Fill(img, Size(128, 128), Color(Random(255), Random(255), Random(255)));
 	JPGEncoder jpg;
-	return jpg.SaveString(img);
+	return Encode64(jpg.SaveString(img));
 }
 
 String Client::RandomName() {

@@ -1,12 +1,23 @@
 #ifndef _Server_Server_h_
 #define _Server_Server_h_
 
-#include <Core/Core.h>
+#include <CtrlLib/CtrlLib.h>
 using namespace Upp;
 
 class Server;
 
-void Print(const String& s);
+namespace Config {
+
+extern IniString server_title;
+extern IniInt port;
+extern IniInt max_sessions;
+extern IniInt max_image_size;
+extern IniInt max_set_string_len;
+extern IniString master_addr;
+extern IniInt master_port;
+
+};
+
 String RandomPassword(int length);
 
 enum {
@@ -23,8 +34,27 @@ enum {
 	
 };
 
+struct LogItem : Moveable<LogItem> {
+	String msg;
+	Time added;
+	
+	void Set(const String& s) {added = GetSysTime(); msg = s;}
+	void Serialize(Stream& s) {s % msg % added;}
+};
+
+struct UserSessionLog : Moveable<LogItem> {
+	Vector<LogItem> log;
+	Time begin = Time(1970,1,1), end = Time(1970,1,1);
+	String peer_addr;
+	
+	
+	void Serialize(Stream& s) {s % log % begin % end % peer_addr;}
+};
 
 class UserDatabase {
+	
+protected:
+	friend class ActiveSession;
 	
 	// Temporary
 	Mutex lock;
@@ -42,6 +72,7 @@ public:
 	
 	
 	// Persistent
+	ArrayMap<int, UserSessionLog> sessions;
 	Index<String> channels;
 	String name, profile_img;
 	unsigned profile_img_hash = 0;
@@ -53,7 +84,7 @@ public:
 	Time lastupdate;
 	bool gender = 1;
 	
-	void Serialize(Stream& s) {s % name % profile_img % profile_img_hash % channels % passhash % age % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate % gender;}
+	void Serialize(Stream& s) {s % sessions % name % profile_img % profile_img_hash % channels % passhash % age % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate % gender;}
 	void Flush();
 	void SetLocation(double longitude, double latitude, double elevation);
 };
@@ -105,6 +136,7 @@ protected:
 	Server* server = NULL;
 	Mutex lock;
 	TcpSocket s;
+	bool stopped = false;
 	
 	int sess_id = -1;
 	int user_id = -1;
@@ -112,10 +144,12 @@ protected:
 	Vector<InboxMessage> inbox;
 	Index<int> channels;
 	
+	Vector<LogItem> log;
 	
 public:
 	typedef ActiveSession CLASSNAME;
 	ActiveSession();
+	void Print(const String& s);
 	void Run();
 	void Start() {Thread::Start(THISBACK(Run));}
 	void GetUserlist(Index<int>& userlist);
@@ -145,7 +179,7 @@ struct MessageRef : Moveable<MessageRef> {
 	MessageRef() {refcount = 0;}
 };
 
-class Server {
+class Server : public TopWindow {
 	
 protected:
 	friend class ActiveSession;
@@ -161,13 +195,36 @@ protected:
 	RWMutex lock, msglock;
 	int channel_counter = 0;
 	int session_counter = 0;
+	bool running = false, stopped = true;
+	
+	Vector<LogItem> log;
+	
+	
+	
+	DropList usermode;
+	ArrayCtrl userlist;
+	ParentCtrl userctrl;
+	ArrayCtrl usersesslist;
+	ArrayCtrl userlog;
+	TabCtrl usertabs;
+	Splitter split;
+	
+	ArrayCtrl serverlog;
+	
+	enum {USER_TAB, SRVLOG_TAB};
+	TabCtrl tabs;
 	
 public:
 	typedef Server CLASSNAME;
 	Server();
+	~Server();
+	
+	void Print(const String& s);
+	void Data();
 	
 	void Init();
 	void Listen();
+	void StartListen() {running = true; stopped = false; Thread::Start(THISBACK(Listen));}
 	void HandleSocket(One<TcpSocket> s);
 	
 	void JoinChannel(const String& channel, ActiveSession& user);
