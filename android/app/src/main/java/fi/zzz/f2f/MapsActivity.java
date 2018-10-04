@@ -5,6 +5,11 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -15,7 +20,9 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
@@ -29,6 +36,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -63,12 +71,36 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         COMPLETED_ONBOARDING_PREF_NAME
     };
 
+    // Client code
+    private int user_id = -1;
+    private byte[] pass;
+    private boolean is_registered = false;
+
+    private HashMap<String, Channel> channels;
+    private HashMap<Integer, User> users;
+    private HashMap<Long, Bitmap> image_cache;
+    private HashSet<String> my_channels;
+    private HashMap<Integer, Marker> markers;
+    private String user_name;
+    private String addr;
+    private String active_channel = "";
+    private Socket sock;
+    private int port = 17000;
+    private int age = 0;
+    private boolean gender = false;
+    private boolean is_logged_in = false;
+    private DataInputStream input;
+    private DataOutputStream output;
+    private Lock call_lock, lock;
+
+
     MapsActivity() {
         call_lock = new ReentrantLock();
         lock = new ReentrantLock();
         channels = new HashMap<String, Channel>();
         users = new HashMap<Integer, User>();
         my_channels = new HashSet<String>();
+        markers = new HashMap<Integer, Marker>();
     }
 
     @Override
@@ -123,7 +155,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 @Override
                 public void run() {
                     try {
-                        addr = "192.168.1.106";
+                        addr = "87.92.111.37";
                         port = 17000;
                         Connect();
                         RegisterScript();
@@ -284,36 +316,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         Exc(String s) {msg = s;}
     }
 
-    // Client code
-    private int user_id = -1;
-    private byte[] pass;
-    private boolean is_registered = false;
-
-    private HashMap<String, Channel> channels;
-    private HashMap<Integer, User> users;
-    private HashMap<Long, Bitmap> image_cache;
-    private HashSet<String> my_channels;
-    private String user_name;
-    private String addr;
-    private String active_channel = "";
-    private Socket sock;
-    private int port = 17000;
-    private int age = 0;
-    private boolean gender = false;
-    private boolean is_logged_in = false;
-    private DataInputStream input;
-    private DataOutputStream output;
-    private Lock call_lock, lock;
-
     void StoreThis() {
 
     }
 
     void LoadThis() {
-
-    }
-
-    void RefreshGui() {
 
     }
 
@@ -336,6 +343,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     boolean Connect() {
+        Log.i(TAG, "Connecting");
         if (sock == null || sock.isClosed()) {
             is_logged_in = false;
 
@@ -528,6 +536,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (IOException e) {}
 
             is_logged_in = false;
+            try {sock.close();} catch (IOException e) {}
             sock = null;
         }
 
@@ -559,27 +568,37 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     DataInputStream Call(byte[] out_data) throws Exc {
         byte[] in_data;
+        int r;
 
         call_lock.lock();
         try {
             sock.setSoTimeout(30000);
-            sock.setKeepAlive(true);
 
             output.writeInt(Swap(out_data.length));
             output.write(out_data);
             //Log.i(TAG, bytesToHex(out_data));
 
             int in_size = Swap(input.readInt());
-            if (in_size < 0 || in_size > 10000000)
+            if (in_size <= 0 || in_size > 10000000)
                 throw new SocketException();
             in_data = new byte[in_size];
-            input.read(in_data);
+            r = input.read(in_data);
+            if (r != in_size)
+                throw new IOException();
             //Log.i(TAG, bytesToHex(in_data));
         }
-        catch (SocketException e) {call_lock.unlock(); throw new Exc("Call: Socket exception");}
-        catch (IOException e) {call_lock.unlock(); throw new Exc("Call: IOException");}
-        call_lock.unlock();
-
+        catch (SocketException e) {
+            throw new Exc("Call: Socket exception");
+        }
+        catch (EOFException e) {
+            throw new Exc("Call: EOFException ");
+        }
+        catch (IOException e) {
+            throw new Exc("Call: IOException");
+        }
+        finally {
+            call_lock.unlock();
+        }
         return new DataInputStream(new ByteArrayInputStream(in_data));
     }
 
@@ -809,6 +828,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     void Poll() throws Exc {
         List<UserJoined> join_list = new ArrayList<UserJoined>();
 
+        lock.lock();
+
         try {
             ByteArrayOutputStream dout = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(dout);
@@ -816,8 +837,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             out.writeInt(Swap(80));
 
             DataInputStream in = Call(dout.toByteArray());
-
-            lock.lock();
 
             int count = Swap(in.readInt());
             if (count < 0 || count >= 10000) {lock.unlock(); throw new Exc("Polling failed");}
@@ -954,7 +973,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         catch (IOException e) {
 
         }
-        lock.unlock();
+        finally {
+            lock.unlock();
+        }
 
         if (!join_list.isEmpty()) {
 
@@ -965,6 +986,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Who(in);
 
                 User u = users.get(uj.user_id);
+                if (u == null) {
+                    Log.e(TAG,"User still null");
+                    continue;
+                }
                 RefreshUserImage(u);
 
                 if (!channels.containsKey(uj.channel)) continue;
@@ -1158,11 +1183,72 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    public Bitmap getCroppedBitmap(Bitmap bitmap) {
+        Bitmap output = Bitmap.createBitmap(bitmap.getWidth(),
+                bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        final int color = 0xff424242;
+        final Paint paint = new Paint();
+        final Rect rect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        paint.setColor(color);
+        // canvas.drawRoundRect(rectF, roundPx, roundPx, paint);
+        canvas.drawCircle(bitmap.getWidth() / 2, bitmap.getHeight() / 2,
+                bitmap.getWidth() / 2, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+        //Bitmap _bmp = Bitmap.createScaledBitmap(output, 60, 60, false);
+        //return _bmp;
+        return output;
+    }
+
+    void RefreshGui() {
+        lock.lock();
+
+        if (!channels.containsKey(active_channel)) {lock.unlock(); return;}
+
+        Channel ch = channels.get(active_channel);
+
+        HashSet<Integer> rem_list = new HashSet<Integer>();
+        for (Integer user_id : markers.keySet())
+            rem_list.add(user_id);
+
+        for (Integer user_id : ch.userlist) {
+            rem_list.remove(user_id);
+
+            User u = users.get(user_id);
+            if (u.profile_image == null)
+                continue;
+
+            LatLng loc = new LatLng(u.l.getLatitude(), u.l.getLongitude());
+            if (!markers.containsKey(user_id)) {
+                Marker m = mMap.addMarker(new MarkerOptions()
+                        .title(u.name)
+                        .position(loc)
+                        .icon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(u.profile_image))));
+                markers.put(user_id, m);
+            }
+            else {
+                Marker m = markers.get(user_id);
+                m.setPosition(loc);
+            }
+        }
+
+        for (Integer user_id : rem_list) {
+            markers.get(user_id).remove();
+        }
+
+        lock.unlock();
+    }
+
     void RefreshGuiChannel() {
 
     }
 
     void SetActiveChannel(String s) {
-
+        active_channel = s;
     }
 }

@@ -21,6 +21,7 @@
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/classAnalysis.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/classAnalysis.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/javaCompile.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/javaCompile.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/taskHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/taskHistory.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
@@ -51,15 +52,26 @@
       <file leaf-file-name="MapsActivity.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="278">
-              <caret line="572" column="50" selection-start-line="572" selection-start-column="50" selection-end-line="572" selection-end-column="50" />
+            <state relative-caret-position="389">
+              <caret line="590" column="31" selection-start-line="590" selection-start-column="27" selection-end-line="590" selection-end-column="31" />
               <folding>
                 <element signature="imports" expanded="true" />
-                <element signature="e#20576#20577#0" expanded="true" />
-                <element signature="e#20659#20660#0" expanded="true" />
-                <element signature="e#25857#25858#0" expanded="true" />
-                <element signature="e#25891#25892#0" expanded="true" />
+                <element signature="e#19789#19790#0" expanded="true" />
+                <element signature="e#19832#19833#0" expanded="true" />
+                <element signature="e#26222#26223#0" expanded="true" />
+                <element signature="e#26278#26279#0" expanded="true" />
+                <element signature="e#43119#43120#0" expanded="true" />
+                <element signature="e#43153#43154#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="Object.java" pinned="false" current-in-tab="false">
+        <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/java/lang/Object.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="7769">
+              <caret line="487" column="29" selection-start-line="487" selection-start-column="29" selection-end-line="487" selection-end-column="29" />
             </state>
           </provider>
         </entry>
@@ -102,22 +114,13 @@
       </file>
       <file leaf-file-name="AndroidManifest.xml" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/app/src/main/AndroidManifest.xml">
-          <provider editor-type-id="android-manifest">
-            <state />
-          </provider>
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="153">
               <caret line="9" column="67" selection-start-line="9" selection-start-column="67" selection-end-line="9" selection-end-column="67" />
             </state>
           </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="Set.java" pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/java/util/Set.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1037">
-              <caret line="84" column="17" selection-start-line="84" selection-start-column="17" selection-end-line="84" selection-end-column="17" />
-            </state>
+          <provider editor-type-id="android-manifest">
+            <state />
           </provider>
         </entry>
       </file>
@@ -137,12 +140,10 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Looper.java" pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/android/os/Looper.java">
+      <file leaf-file-name="Thread.java" pinned="false" current-in-tab="false">
+        <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/java/lang/Thread.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2363">
-              <caret line="161" column="75" selection-start-line="161" selection-start-column="75" selection-end-line="161" selection-end-column="75" />
-            </state>
+            <state />
           </provider>
         </entry>
       </file>
@@ -159,16 +160,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>//</find>
-      <find>PostRefreshGui</find>
-      <find>profile_image_hash</find>
-      <find>valueOf</find>
-      <find>Bitmap.</find>
-      <find>decode</find>
-      <find>RefreshLocation</find>
-      <find>500</find>
-      <find>out.writeInt(Swap(</find>
-      <find>ser image refresh failed:</find>
       <find>u.profile_image_hash</find>
       <find>SendLo</find>
       <find>writeDouble</find>
@@ -189,6 +180,16 @@
       <find>String</find>
       <find>StandardCharsets.ISO_8859_1</find>
       <find>new String(</find>
+      <find>RefreshGuiChannel</find>
+      <find>Post</find>
+      <find>PostRefreshGui</find>
+      <find>active_channel</find>
+      <find>profile_image</find>
+      <find>Connect</find>
+      <find>call_lock</find>
+      <find>catch</find>
+      <find>Join</find>
+      <find>Call</find>
     </findStrings>
   </component>
   <component name="GradleLocalSettings">
@@ -2460,7 +2461,7 @@
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="6">
+  <component name="ProjectFrameBounds" extendedState="7">
     <option name="x" value="953" />
     <option name="width" value="974" />
     <option name="height" value="1047" />
@@ -2475,6 +2476,7 @@
     </navigator>
     <panes>
       <pane id="ProjectPane" />
+      <pane id="Scope" />
       <pane id="AndroidView">
         <subPane>
           <expand>
@@ -2486,7 +2488,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
       <pane id="PackagesPane" />
     </panes>
   </component>
@@ -2679,7 +2680,14 @@
       <option name="project" value="LOCAL" />
       <updated>1538588977340</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Use byte array as storage instead of strings, which has encoding">
+      <created>1538659750452</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1538659750452</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TodoView">
@@ -2692,7 +2700,7 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="7" />
     <editor active="true" />
     <layout>
       <window_info anchor="bottom" id="Android Profiler" order="12" />
@@ -2701,7 +2709,7 @@
       <window_info id="Image Layers" order="7" />
       <window_info id="Build Variants" order="3" side_tool="true" />
       <window_info anchor="right" id="Capture Analysis" order="3" />
-      <window_info anchor="bottom" id="Event Log" order="8" sideWeight="0.2947761" side_tool="true" visible="true" weight="0.39502165" />
+      <window_info anchor="bottom" id="Event Log" order="8" sideWeight="0.5250533" side_tool="true" visible="true" weight="0.31060606" />
       <window_info anchor="bottom" id="Run" order="2" />
       <window_info anchor="bottom" id="Version Control" order="9" />
       <window_info anchor="bottom" id="Terminal" order="11" sideWeight="0.4990403" weight="0.32896176" />
@@ -2709,13 +2717,13 @@
       <window_info id="Captures" order="4" weight="0.25" />
       <window_info id="Capture Tool" order="6" />
       <window_info id="Designer" order="2" />
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.13113007" />
-      <window_info anchor="bottom" id="Build" order="7" sideWeight="0.47707888" weight="0.31060606" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.063432835" />
+      <window_info active="true" anchor="bottom" id="Build" order="7" sideWeight="0.4749467" visible="true" weight="0.31060606" />
       <window_info anchor="right" id="Gradle" order="5" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="right" id="Device File Explorer" order="4" side_tool="true" />
       <window_info anchor="right" id="Theme Preview" order="8" />
-      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.70522386" visible="true" weight="0.39502165" />
+      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.7036247" weight="0.39502165" />
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="right" id="Assistant" order="6" visible="true" weight="0.31130064" />
       <window_info anchor="bottom" id="Messages" order="13" weight="0.32896176" />
@@ -2736,39 +2744,35 @@
     <MESSAGE value="Android main layout" />
     <MESSAGE value="Client code conversion from C++ version progressed" />
     <MESSAGE value="Bug identified: fucking java shit doesn't transmit higher 4 bits of byte via socket. Unbelieveable." />
-    <option name="LAST_COMMIT_MESSAGE" value="Bug identified: fucking java shit doesn't transmit higher 4 bits of byte via socket. Unbelieveable." />
+    <MESSAGE value="Use byte array as storage instead of strings, which has encoding" />
+    <option name="LAST_COMMIT_MESSAGE" value="Use byte array as storage instead of strings, which has encoding" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>533</line>
+          <line>542</line>
           <properties />
           <option name="timeStamp" value="9" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>359</line>
+          <line>367</line>
           <properties />
           <option name="timeStamp" value="10" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>355</line>
+          <line>363</line>
           <properties />
           <option name="timeStamp" value="11" />
         </line-breakpoint>
       </breakpoints>
-      <option name="time" value="120" />
+      <option name="time" value="151" />
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="android-dummy://C:/F2F.git/trunk/android//Theme Editor">
-      <provider selected="true" editor-type-id="themeEditor">
-        <state module-name="app" proportion="0.67" />
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/values/colors.xml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="102">
@@ -2809,10 +2813,12 @@
           <caret line="85" column="49" lean-forward="true" selection-start-line="85" selection-start-column="49" selection-end-line="85" selection-end-column="49" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#20576#20577#0" expanded="true" />
-            <element signature="e#20659#20660#0" expanded="true" />
-            <element signature="e#25857#25858#0" expanded="true" />
-            <element signature="e#25891#25892#0" expanded="true" />
+            <element signature="e#19789#19790#0" expanded="true" />
+            <element signature="e#19832#19833#0" expanded="true" />
+            <element signature="e#26222#26223#0" expanded="true" />
+            <element signature="e#26278#26279#0" expanded="true" />
+            <element signature="e#43119#43120#0" expanded="true" />
+            <element signature="e#43153#43154#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -2890,10 +2896,12 @@
           <caret line="43" column="73" selection-start-line="43" selection-start-column="73" selection-end-line="43" selection-end-column="73" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#20576#20577#0" expanded="true" />
-            <element signature="e#20659#20660#0" expanded="true" />
-            <element signature="e#25857#25858#0" expanded="true" />
-            <element signature="e#25891#25892#0" expanded="true" />
+            <element signature="e#19789#19790#0" expanded="true" />
+            <element signature="e#19832#19833#0" expanded="true" />
+            <element signature="e#26222#26223#0" expanded="true" />
+            <element signature="e#26278#26279#0" expanded="true" />
+            <element signature="e#43119#43120#0" expanded="true" />
+            <element signature="e#43153#43154#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -2963,13 +2971,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="17714">
           <caret line="1123" selection-start-line="1123" selection-end-line="1123" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/java/lang/Object.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="7769">
-          <caret line="487" column="29" selection-start-line="487" selection-start-column="29" selection-end-line="487" selection-end-column="29" />
         </state>
       </provider>
     </entry>
@@ -3092,11 +3093,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/android/os/MessageQueue.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state />
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/android/app/ActivityThread.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="106760">
@@ -3133,25 +3129,44 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/AndroidManifest.xml">
-      <provider editor-type-id="android-manifest">
-        <state />
-      </provider>
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="153">
           <caret line="9" column="67" selection-start-line="9" selection-start-column="67" selection-end-line="9" selection-end-column="67" />
         </state>
       </provider>
+      <provider editor-type-id="android-manifest">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/java/lang/Object.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7769">
+          <caret line="487" column="29" selection-start-line="487" selection-start-column="29" selection-end-line="487" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/android/os/MessageQueue.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state />
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/AppData/Local/Android/Sdk/sources/android-28/java/lang/Thread.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state />
+      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="278">
-          <caret line="572" column="50" selection-start-line="572" selection-start-column="50" selection-end-line="572" selection-end-column="50" />
+        <state relative-caret-position="389">
+          <caret line="590" column="31" selection-start-line="590" selection-start-column="27" selection-end-line="590" selection-end-column="31" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#20576#20577#0" expanded="true" />
-            <element signature="e#20659#20660#0" expanded="true" />
-            <element signature="e#25857#25858#0" expanded="true" />
-            <element signature="e#25891#25892#0" expanded="true" />
+            <element signature="e#19789#19790#0" expanded="true" />
+            <element signature="e#19832#19833#0" expanded="true" />
+            <element signature="e#26222#26223#0" expanded="true" />
+            <element signature="e#26278#26279#0" expanded="true" />
+            <element signature="e#43119#43120#0" expanded="true" />
+            <element signature="e#43153#43154#0" expanded="true" />
           </folding>
         </state>
       </provider>
