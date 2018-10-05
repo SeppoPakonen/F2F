@@ -269,7 +269,7 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		Print("Set profile image");
 		
 		if (value.GetCount() > Config::max_image_size) throw Exc("Invalid image received");
-		db.profile_img = Decode64(value);
+		db.profile_img = value;
 		db.profile_img_hash = db.profile_img.GetHashValue();
 		db.Flush();
 		
@@ -491,11 +491,11 @@ void ActiveSession::Message(Stream& in, Stream& out) {
 	
 	const MessageRef& ref = server->IncReference("msg " + recv_msg, 1);
 	
-	lock.Enter();
+	recv_as.lock.Enter();
 	InboxMessage& msg = recv_as.inbox.Add();
 	msg.msg = ref.hash;
 	msg.sender_id = user_id;
-	lock.Leave();
+	recv_as.lock.Leave();
 	
 	out.Put32(0);
 }

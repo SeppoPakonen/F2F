@@ -4,6 +4,9 @@
 #include <CtrlLib/CtrlLib.h>
 using namespace Upp;
 
+#include "BotClient.h"
+
+
 class Server;
 
 namespace Config {
@@ -152,6 +155,7 @@ public:
 	void Print(const String& s);
 	void Run();
 	void Start() {Thread::Start(THISBACK(Run));}
+	void Stop() {s.Close();}
 	void GetUserlist(Index<int>& userlist);
 	void StoreImageCache(unsigned hash, const String& image_str);
 	
@@ -184,6 +188,12 @@ class Server : public TopWindow {
 protected:
 	friend class ActiveSession;
 	
+	// Persistent
+	int session_counter = 0;
+	Vector<LogItem> log;
+	
+	
+	// Temporary
 	ArrayMap<int, ActiveSession> sessions;
 	ArrayMap<int, Channel> channels;
 	VectorMap<int, int> user_session_ids;
@@ -194,17 +204,21 @@ protected:
 	ServerDatabase db;
 	RWMutex lock, msglock;
 	int channel_counter = 0;
-	int session_counter = 0;
 	bool running = false, stopped = true;
 	
-	Vector<LogItem> log;
 	
 	
+	Array<Client> clients;
+	TimeCallback tc;
+	
+	MenuBar menubar;
 	
 	DropList usermode;
 	ArrayCtrl userlist;
 	ParentCtrl userctrl;
 	ArrayCtrl usersesslist;
+	ArrayCtrl userchannels, userdetails;
+	Splitter usermainsplit;
 	ArrayCtrl userlog;
 	TabCtrl usertabs;
 	Splitter split;
@@ -218,6 +232,16 @@ public:
 	typedef Server CLASSNAME;
 	Server();
 	~Server();
+	
+	void StoreThis() {StoreToFile(*this, ConfigFile("Server.bin"));}
+	void LoadThis() {LoadFromFile(*this, ConfigFile("Server.bin"));}
+	void Serialize(Stream& s) {s % session_counter % log;}
+	
+	void TimedRefresh();
+	void MainMenu(Bar& bar);
+	void AddBots();
+	void RemoveBots();
+	void CloseSession();
 	
 	void Print(const String& s);
 	void Data();

@@ -29,6 +29,12 @@ String RandomPassword(int length) {
 
 Server::Server() {
 	Title("F2F Server");
+	MinimizeBox().MaximizeBox().Sizeable();
+	
+	LoadThis();
+	
+	AddFrame(menubar);
+	menubar.Set(THISBACK(MainMenu));
 	
 	usermode.Add("Active sessions");
 	usermode.Add("All users");
@@ -41,9 +47,16 @@ Server::Server() {
 	usersesslist.AddColumn("Begin");
 	usersesslist.AddColumn("End");
 	usersesslist <<= THISBACK(Data);
+	userchannels.AddColumn("Channel");
+	userdetails.AddColumn("Key");
+	userdetails.AddColumn("Value");
+	usermainsplit.Horz();
+	usermainsplit << userchannels << userdetails;
+	usermainsplit.SetPos(3333);
 	userlog.AddColumn("Time");
 	userlog.AddColumn("Message");
 	userlog.ColumnWidths("1 4");
+	usertabs.Add(usermainsplit.SizePos(), "Main");
 	usertabs.Add(userlog.SizePos(), "Log");
 	split << userctrl << usersesslist << usertabs;
 	split.SetPos(2500, 0);
@@ -58,10 +71,62 @@ Server::Server() {
 	
 	Add(tabs.SizePos());
 	tabs.WhenSet << THISBACK(Data);
+	
+	tc.Set(1000, THISBACK(TimedRefresh));
 }
 
 Server::~Server() {
+	RemoveBots();
 	running = false; listener.Close(); while (!stopped) Sleep(100);
+	StoreThis();
+}
+
+void Server::TimedRefresh() {
+	PostCallback(THISBACK(Data));
+	tc.Set(1000, THISBACK(TimedRefresh));
+}
+
+void Server::MainMenu(Bar& bar) {
+	bar.Sub("Server", [=](Bar& bar) {
+		bar.Add("Add bots", THISBACK(AddBots));
+		bar.Add("Remove bots", THISBACK(RemoveBots));
+		bar.Separator();
+		bar.Add("Close session connection", THISBACK(CloseSession)).Key(K_CTRL|K_C);
+	});
+}
+
+void Server::AddBots() {
+	for(int i = 0; i < 10; i++) {
+		Client& c = clients.Add();
+		c.SetId(clients.GetCount() - 1);
+		c.Start();
+	}
+}
+
+void Server::RemoveBots() {
+	for(int i = 0; i < clients.GetCount(); i++) {
+		Client& c = clients[i];
+		c.Stop();
+	}
+	for(int i = 0; i < clients.GetCount(); i++)
+		clients[i].Wait();
+}
+
+void Server::CloseSession() {
+	int user_cursor = userlist.GetCursor();
+	if (user_cursor >= 0 && user_cursor < userlist.GetCount()) {
+		int user_id = userlist.Get(user_cursor, 0);
+		const UserDatabase& db = GetDatabase(user_id);
+		int usersess_cursor = usersesslist.GetCursor();
+		if (usersess_cursor >= 0 && usersess_cursor < db.sessions.GetCount()) {
+			int sess_id = db.sessions.GetKey(usersess_cursor);
+			//const UserSessionLog& usl = db.sessions[usersess_cursor];
+			int i = sessions.Find(sess_id);
+			if (i != -1) {
+				sessions[i].Stop();
+			}
+		}
+	}
 }
 
 void Server::Print(const String& s) {
@@ -92,7 +157,13 @@ void Server::Data() {
 			userlist.SetCount(row);
 		}
 		else if (mode == 1) {
-			
+			int row = 0;
+			for(int i = 0; i < db.GetUserCount(); i++) {
+				userlist.Set(row, 0, i);
+				userlist.Set(row, 1, db.GetUser(i));
+				row++;
+			}
+			userlist.SetCount(row);
 		}
 		
 		int user_cursor = userlist.GetCursor();
@@ -111,8 +182,53 @@ void Server::Data() {
 			int usersess_cursor = usersesslist.GetCursor();
 			if (usersess_cursor >= 0 && usersess_cursor < db.sessions.GetCount()) {
 				const UserSessionLog& usl = db.sessions[usersess_cursor];
+				int usertab = usertabs.Get();
 				
-				if (usertabs.Get() == 0) {
+				if (usertab == 0) {
+					for(int i = 0; i < db.channels.GetCount(); i++) {
+						userchannels.Set(i, 0, db.channels[i]);
+					}
+					userchannels.SetCount(db.channels.GetCount());
+					int row = 0;
+					userdetails.Set(row, 0, "User id");
+					userdetails.Set(row++, 1, user_id);
+					userdetails.Set(row, 0, "Name");
+					userdetails.Set(row++, 1, db.name);
+					userdetails.Set(row, 0, "Profile image");
+					userdetails.Set(row, 1, StreamRaster::LoadStringAny(db.profile_img));
+					if (db.profile_img.IsEmpty())
+						userdetails.SetDisplay(row++, 1, StdDisplay());
+					else
+						userdetails.SetDisplay(row++, 1, ImageDisplay());
+					userdetails.Set(row, 0, "Age");
+					userdetails.Set(row++, 1, (int)db.age);
+					userdetails.Set(row, 0, "Gender");
+					userdetails.Set(row++, 1, db.gender ? "Male" : "Female");
+					userdetails.Set(row, 0, "Profile image hash");
+					userdetails.Set(row++, 1, (int64)db.profile_img_hash);
+					userdetails.Set(row, 0, "Password hash");
+					userdetails.Set(row++, 1, (int64)db.passhash);
+					userdetails.Set(row, 0, "Joined");
+					userdetails.Set(row++, 1, db.joined);
+					userdetails.Set(row, 0, "Last login");
+					userdetails.Set(row++, 1, db.lastlogin);
+					userdetails.Set(row, 0, "Logins");
+					userdetails.Set(row++, 1, db.logins);
+					userdetails.Set(row, 0, "Online-total");
+					userdetails.Set(row++, 1, db.onlinetotal);
+					userdetails.Set(row, 0, "Visible-total");
+					userdetails.Set(row++, 1, db.visibletotal);
+					userdetails.Set(row, 0, "Latitude");
+					userdetails.Set(row++, 1, db.latitude);
+					userdetails.Set(row, 0, "Longitude");
+					userdetails.Set(row++, 1, db.longitude);
+					userdetails.Set(row, 0, "Elevation");
+					userdetails.Set(row++, 1, db.elevation);
+					userdetails.Set(row, 0, "Last update");
+					userdetails.Set(row++, 1, db.lastupdate);
+					userdetails.SetCount(row);
+				}
+				else if (usertab == 1) {
 					for(int i = 0; i < usl.log.GetCount(); i++) {
 						const LogItem& li = usl.log[i];
 						userlog.Set(i, 0, li.added);
@@ -219,7 +335,7 @@ void Server::Listen() {
 				}
 			}
 			
-			if (ts.Elapsed() > 60*1000) {
+			if (ts.Elapsed() > 1000) {
 				lock.EnterWrite();
 				for(int i = 0; i < sessions.GetCount(); i++) {
 					if (!sessions[i].s.IsOpen()) {
