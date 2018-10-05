@@ -52,16 +52,20 @@
       <file leaf-file-name="MapsActivity.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="389">
-              <caret line="590" column="31" selection-start-line="590" selection-start-column="27" selection-end-line="590" selection-end-column="31" />
+            <state relative-caret-position="210">
+              <caret line="1007" column="36" selection-start-line="1007" selection-start-column="36" selection-end-line="1007" selection-end-column="36" />
               <folding>
                 <element signature="imports" expanded="true" />
-                <element signature="e#19789#19790#0" expanded="true" />
-                <element signature="e#19832#19833#0" expanded="true" />
-                <element signature="e#26222#26223#0" expanded="true" />
-                <element signature="e#26278#26279#0" expanded="true" />
-                <element signature="e#43119#43120#0" expanded="true" />
-                <element signature="e#43153#43154#0" expanded="true" />
+                <element signature="e#8025#8401#0" expanded="true" />
+                <element signature="e#8400#8401#0" expanded="true" />
+                <element signature="e#11729#11853#0" expanded="true" />
+                <element signature="e#11852#11853#0" expanded="true" />
+                <element signature="e#33440#33787#0" expanded="true" />
+                <element signature="e#33786#33787#0" expanded="true" />
+                <element signature="e#35300#37024#0" expanded="true" />
+                <element signature="e#37023#37024#0" expanded="true" />
+                <element signature="e#47064#47065#0" expanded="true" />
+                <element signature="e#47098#47099#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -160,16 +164,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>u.profile_image_hash</find>
-      <find>SendLo</find>
-      <find>writeDouble</find>
-      <find>SwapLong</find>
-      <find>setLongitude</find>
-      <find>Who</find>
-      <find>Invalid mes</find>
-      <find>profile</find>
-      <find>Base64</find>
-      <find>Swap</find>
       <find>writeBy</find>
       <find>output</find>
       <find>ByteBuffer</find>
@@ -181,15 +175,25 @@
       <find>StandardCharsets.ISO_8859_1</find>
       <find>new String(</find>
       <find>RefreshGuiChannel</find>
-      <find>Post</find>
       <find>PostRefreshGui</find>
       <find>active_channel</find>
-      <find>profile_image</find>
       <find>Connect</find>
       <find>call_lock</find>
-      <find>catch</find>
       <find>Join</find>
       <find>Call</find>
+      <find>catch</find>
+      <find>Post</find>
+      <find>Post(</find>
+      <find>changed</find>
+      <find>name</find>
+      <find>&quot;name&quot;</find>
+      <find>&quot;profile</find>
+      <find>createScaledBitmap</find>
+      <find>Color</find>
+      <find>profile_image</find>
+      <find>marker</find>
+      <find>my_marker</find>
+      <find>SendLocation</find>
     </findStrings>
   </component>
   <component name="GradleLocalSettings">
@@ -2461,7 +2465,7 @@
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="7">
+  <component name="ProjectFrameBounds" extendedState="6">
     <option name="x" value="953" />
     <option name="width" value="974" />
     <option name="height" value="1047" />
@@ -2475,8 +2479,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="ProjectPane" />
-      <pane id="Scope" />
       <pane id="AndroidView">
         <subPane>
           <expand>
@@ -2489,6 +2491,8 @@
         </subPane>
       </pane>
       <pane id="PackagesPane" />
+      <pane id="ProjectPane" />
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -2700,7 +2704,7 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1056" extended-state="7" />
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info anchor="bottom" id="Android Profiler" order="12" />
@@ -2709,7 +2713,7 @@
       <window_info id="Image Layers" order="7" />
       <window_info id="Build Variants" order="3" side_tool="true" />
       <window_info anchor="right" id="Capture Analysis" order="3" />
-      <window_info anchor="bottom" id="Event Log" order="8" sideWeight="0.5250533" side_tool="true" visible="true" weight="0.31060606" />
+      <window_info anchor="bottom" id="Event Log" order="8" sideWeight="0.3001066" side_tool="true" visible="true" weight="0.39502165" />
       <window_info anchor="bottom" id="Run" order="2" />
       <window_info anchor="bottom" id="Version Control" order="9" />
       <window_info anchor="bottom" id="Terminal" order="11" sideWeight="0.4990403" weight="0.32896176" />
@@ -2717,13 +2721,13 @@
       <window_info id="Captures" order="4" weight="0.25" />
       <window_info id="Capture Tool" order="6" />
       <window_info id="Designer" order="2" />
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.063432835" />
-      <window_info active="true" anchor="bottom" id="Build" order="7" sideWeight="0.4749467" visible="true" weight="0.31060606" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.1391258" />
+      <window_info anchor="bottom" id="Build" order="7" sideWeight="0.4717484" weight="0.31060606" />
       <window_info anchor="right" id="Gradle" order="5" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="right" id="Device File Explorer" order="4" side_tool="true" />
       <window_info anchor="right" id="Theme Preview" order="8" />
-      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.7036247" weight="0.39502165" />
+      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.6998934" visible="true" weight="0.39502165" />
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="right" id="Assistant" order="6" visible="true" weight="0.31130064" />
       <window_info anchor="bottom" id="Messages" order="13" weight="0.32896176" />
@@ -2752,24 +2756,240 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>167</line>
+          <properties />
+          <option name="timeStamp" value="151" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>187</line>
+          <properties />
+          <option name="timeStamp" value="152" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>221</line>
+          <properties />
+          <option name="timeStamp" value="153" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>373</line>
+          <properties />
+          <option name="timeStamp" value="154" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>369</line>
+          <properties />
+          <option name="timeStamp" value="155" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>388</line>
+          <properties />
+          <option name="timeStamp" value="157" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>409</line>
+          <properties />
+          <option name="timeStamp" value="158" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>422</line>
+          <properties />
+          <option name="timeStamp" value="159" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>433</line>
+          <properties />
+          <option name="timeStamp" value="160" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>444</line>
+          <properties />
+          <option name="timeStamp" value="161" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>455</line>
+          <properties />
+          <option name="timeStamp" value="162" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>471</line>
+          <properties />
+          <option name="timeStamp" value="163" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>488</line>
+          <properties />
+          <option name="timeStamp" value="164" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>491</line>
+          <properties />
+          <option name="timeStamp" value="165" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>511</line>
+          <properties />
+          <option name="timeStamp" value="166" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>514</line>
+          <properties />
+          <option name="timeStamp" value="167" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>539</line>
+          <properties />
+          <option name="timeStamp" value="168" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
           <line>542</line>
           <properties />
-          <option name="timeStamp" value="9" />
+          <option name="timeStamp" value="169" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>367</line>
+          <line>599</line>
           <properties />
-          <option name="timeStamp" value="10" />
+          <option name="timeStamp" value="170" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>363</line>
+          <line>602</line>
           <properties />
-          <option name="timeStamp" value="11" />
+          <option name="timeStamp" value="171" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>605</line>
+          <properties />
+          <option name="timeStamp" value="172" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>655</line>
+          <properties />
+          <option name="timeStamp" value="173" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>681</line>
+          <properties />
+          <option name="timeStamp" value="174" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>706</line>
+          <properties />
+          <option name="timeStamp" value="175" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>733</line>
+          <properties />
+          <option name="timeStamp" value="176" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>762</line>
+          <properties />
+          <option name="timeStamp" value="177" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>786</line>
+          <properties />
+          <option name="timeStamp" value="178" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>808</line>
+          <properties />
+          <option name="timeStamp" value="179" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1024</line>
+          <properties />
+          <option name="timeStamp" value="180" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1074</line>
+          <properties />
+          <option name="timeStamp" value="181" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1077</line>
+          <properties />
+          <option name="timeStamp" value="182" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1101</line>
+          <properties />
+          <option name="timeStamp" value="183" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1140</line>
+          <properties />
+          <option name="timeStamp" value="184" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1185</line>
+          <properties />
+          <option name="timeStamp" value="185" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1207</line>
+          <properties />
+          <option name="timeStamp" value="186" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1210</line>
+          <properties />
+          <option name="timeStamp" value="187" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>595</line>
+          <properties />
+          <option name="timeStamp" value="189" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1245</line>
+          <properties />
+          <option name="timeStamp" value="192" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>590</line>
+          <properties />
+          <option name="timeStamp" value="205" />
         </line-breakpoint>
       </breakpoints>
-      <option name="time" value="151" />
+      <option name="time" value="206" />
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
@@ -2781,23 +3001,23 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/layout/nav_header.xml">
-      <provider editor-type-id="android-designer2">
-        <state />
-      </provider>
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="221">
           <caret line="13" column="41" selection-start-line="13" selection-start-column="30" selection-end-line="13" selection-end-column="41" />
         </state>
       </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/app/src/main/res/menu/drawer_view.xml">
       <provider editor-type-id="android-designer2">
         <state />
       </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/app/src/main/res/menu/drawer_view.xml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="374">
           <caret line="22" column="13" selection-start-line="22" selection-start-column="13" selection-end-line="22" selection-end-column="13" />
         </state>
+      </provider>
+      <provider editor-type-id="android-designer2">
+        <state />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/values/strings.xml">
@@ -2813,12 +3033,16 @@
           <caret line="85" column="49" lean-forward="true" selection-start-line="85" selection-start-column="49" selection-end-line="85" selection-end-column="49" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#19789#19790#0" expanded="true" />
-            <element signature="e#19832#19833#0" expanded="true" />
-            <element signature="e#26222#26223#0" expanded="true" />
-            <element signature="e#26278#26279#0" expanded="true" />
-            <element signature="e#43119#43120#0" expanded="true" />
-            <element signature="e#43153#43154#0" expanded="true" />
+            <element signature="e#8025#8401#0" expanded="true" />
+            <element signature="e#8400#8401#0" expanded="true" />
+            <element signature="e#11729#11853#0" expanded="true" />
+            <element signature="e#11852#11853#0" expanded="true" />
+            <element signature="e#33440#33787#0" expanded="true" />
+            <element signature="e#33786#33787#0" expanded="true" />
+            <element signature="e#35300#37024#0" expanded="true" />
+            <element signature="e#37023#37024#0" expanded="true" />
+            <element signature="e#47064#47065#0" expanded="true" />
+            <element signature="e#47098#47099#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -2864,23 +3088,23 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/layout/nav_header.xml">
-      <provider editor-type-id="android-designer2">
-        <state />
-      </provider>
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="221">
           <caret line="13" column="41" selection-start-line="13" selection-start-column="30" selection-end-line="13" selection-end-column="41" />
         </state>
       </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/app/src/main/res/menu/drawer_view.xml">
       <provider editor-type-id="android-designer2">
         <state />
       </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/app/src/main/res/menu/drawer_view.xml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="374">
           <caret line="22" column="13" selection-start-line="22" selection-start-column="13" selection-end-line="22" selection-end-column="13" />
         </state>
+      </provider>
+      <provider editor-type-id="android-designer2">
+        <state />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/values/strings.xml">
@@ -2896,12 +3120,16 @@
           <caret line="43" column="73" selection-start-line="43" selection-start-column="73" selection-end-line="43" selection-end-column="73" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#19789#19790#0" expanded="true" />
-            <element signature="e#19832#19833#0" expanded="true" />
-            <element signature="e#26222#26223#0" expanded="true" />
-            <element signature="e#26278#26279#0" expanded="true" />
-            <element signature="e#43119#43120#0" expanded="true" />
-            <element signature="e#43153#43154#0" expanded="true" />
+            <element signature="e#8025#8401#0" expanded="true" />
+            <element signature="e#8400#8401#0" expanded="true" />
+            <element signature="e#11729#11853#0" expanded="true" />
+            <element signature="e#11852#11853#0" expanded="true" />
+            <element signature="e#33440#33787#0" expanded="true" />
+            <element signature="e#33786#33787#0" expanded="true" />
+            <element signature="e#35300#37024#0" expanded="true" />
+            <element signature="e#37023#37024#0" expanded="true" />
+            <element signature="e#47064#47065#0" expanded="true" />
+            <element signature="e#47098#47099#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -3010,13 +3238,13 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/layout/activity_maps.xml">
-      <provider editor-type-id="android-designer2">
-        <state />
-      </provider>
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="439">
           <caret line="36" selection-start-line="36" selection-end-line="36" />
         </state>
+      </provider>
+      <provider editor-type-id="android-designer2">
+        <state />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/build.gradle">
@@ -3027,13 +3255,13 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/menu/drawer_view.xml">
-      <provider editor-type-id="android-designer2">
-        <state />
-      </provider>
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="374">
           <caret line="22" column="13" selection-start-line="22" selection-start-column="13" selection-end-line="22" selection-end-column="13" />
         </state>
+      </provider>
+      <provider editor-type-id="android-designer2">
+        <state />
       </provider>
     </entry>
     <entry file="android-dummy://C:/F2F.git/trunk/android//Theme Editor">
@@ -3049,13 +3277,13 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/layout/nav_header.xml">
-      <provider editor-type-id="android-designer2">
-        <state />
-      </provider>
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="221">
           <caret line="13" column="41" selection-start-line="13" selection-start-column="30" selection-end-line="13" selection-end-column="41" />
         </state>
+      </provider>
+      <provider editor-type-id="android-designer2">
+        <state />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/res/values/strings.xml">
@@ -3097,13 +3325,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="106760">
           <caret line="6522" selection-start-line="6522" selection-end-line="6522" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://$APPLICATION_HOME_DIR$/jre/jre/lib/rt.jar!/java/net/SocketInputStream.class">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="357">
-          <caret line="30" column="23" selection-start-line="30" selection-start-column="23" selection-end-line="30" selection-end-column="23" />
         </state>
       </provider>
     </entry>
@@ -3155,18 +3376,29 @@
         <state />
       </provider>
     </entry>
+    <entry file="jar://$APPLICATION_HOME_DIR$/jre/jre/lib/rt.jar!/java/net/SocketInputStream.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="357">
+          <caret line="30" column="23" selection-start-line="30" selection-start-column="23" selection-end-line="30" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="389">
-          <caret line="590" column="31" selection-start-line="590" selection-start-column="27" selection-end-line="590" selection-end-column="31" />
+        <state relative-caret-position="210">
+          <caret line="1007" column="36" selection-start-line="1007" selection-start-column="36" selection-end-line="1007" selection-end-column="36" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#19789#19790#0" expanded="true" />
-            <element signature="e#19832#19833#0" expanded="true" />
-            <element signature="e#26222#26223#0" expanded="true" />
-            <element signature="e#26278#26279#0" expanded="true" />
-            <element signature="e#43119#43120#0" expanded="true" />
-            <element signature="e#43153#43154#0" expanded="true" />
+            <element signature="e#8025#8401#0" expanded="true" />
+            <element signature="e#8400#8401#0" expanded="true" />
+            <element signature="e#11729#11853#0" expanded="true" />
+            <element signature="e#11852#11853#0" expanded="true" />
+            <element signature="e#33440#33787#0" expanded="true" />
+            <element signature="e#33786#33787#0" expanded="true" />
+            <element signature="e#35300#37024#0" expanded="true" />
+            <element signature="e#37023#37024#0" expanded="true" />
+            <element signature="e#47064#47065#0" expanded="true" />
+            <element signature="e#47098#47099#0" expanded="true" />
           </folding>
         </state>
       </provider>

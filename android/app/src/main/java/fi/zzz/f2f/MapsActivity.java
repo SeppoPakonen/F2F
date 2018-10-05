@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
@@ -20,6 +21,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -42,8 +44,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -56,6 +56,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -81,6 +82,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private HashMap<Long, Bitmap> image_cache;
     private HashSet<String> my_channels;
     private HashMap<Integer, Marker> markers;
+    private Marker my_marker;
     private String user_name;
     private String addr;
     private String active_channel = "";
@@ -206,6 +208,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         // Define a listener that responds to location updates
         LocationListener locationListener = new LocationListener() {
             public void onLocationChanged(final Location location) {
+
+                my_marker.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+
                 // Called when a new location is found by the network location provider.
                 Thread thread = new Thread() {
                     @Override
@@ -248,7 +253,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // Add a marker in Sydney and move the camera
         LatLng oulu_uni = new LatLng(65.05919, 25.46748);
-        mMap.addMarker(new MarkerOptions().position(oulu_uni).title("Marker in Oulu University"));
+        my_marker = mMap.addMarker(new MarkerOptions().position(oulu_uni).title("Marker in Oulu University"));
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(oulu_uni, 16.0f));
         mMap.setIndoorEnabled(true);
 
@@ -301,13 +306,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             messages = new ArrayList<ChannelMessage>();
             userlist = new HashSet<Integer>();
         }
-        void Post(int user_id, String user_name, String msg) {
+        void Post(String ch_name, int user_id, String user_name, String msg) {
             ChannelMessage m = new ChannelMessage();
             m.received = Calendar.getInstance().getTime();
             m.message = msg;
             m.sender_id = user_id;
             m.sender_name = user_name;
             messages.add(m);
+            Log.i(TAG, Integer.toString(user_id) + ", " + user_name + " sent to channel " + ch_name + " message " + msg);
         }
     }
 
@@ -533,7 +539,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (Exc e) {
                 Log.e(TAG, "Error: " + e);
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                Log.e(TAG, "Error: IOException");
+            }
 
             is_logged_in = false;
             try {sock.close();} catch (IOException e) {}
@@ -582,6 +590,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (in_size <= 0 || in_size > 10000000)
                 throw new SocketException();
             in_data = new byte[in_size];
+            for (int i = 0; i < 100 && input.available() < in_size; i++) Sleep(10);
             r = input.read(in_data);
             if (r != in_size)
                 throw new IOException();
@@ -867,7 +876,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                     Channel ch = channels.get(ch_name);
                     if (!ch.userlist.contains(sender_id)) ch.userlist.add(sender_id);
-                    ch.Post(sender_id, u.name, message);
+                    ch.Post(ch_name, sender_id, u.name, message);
                     PostRefreshGui();
                 }
                 else if (key.equals("chmsg")) {
@@ -879,7 +888,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     message = message.substring(j + 1);
                     if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                     Channel ch = channels.get(ch_name);
-                    ch.Post(sender_id, u.name, message);
+                    ch.Post(ch_name, sender_id, u.name, message);
                     PostRefreshGui();
                 }
                 else if (key.equals("join")) {
@@ -912,7 +921,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (!channels.containsKey(ch_name)) continue;
                     Channel ch = channels.get(ch_name);
                     ch.userlist.remove(user_id);
-                    ch.Post(-1, "Server", "User " + u.name + " left channel " + ch_name);
+                    ch.Post(ch_name, -1, "Server", "User " + u.name + " left channel " + ch_name);
                     if (u.channels.isEmpty())
                         users.remove(user_id);
                     PostRefreshGui();
@@ -926,16 +935,22 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (!users.containsKey(user_id)) continue;
                     User u = users.get(user_id);
                     u.name = user_name;
+                    for (String ch_name : u.channels) {
+                        if (!my_channels.contains(ch_name)) continue;
+                        if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
+                        Channel ch = channels.get(ch_name);
+                        ch.Post(ch_name, -1, "Server", "User " + u.name + " changed name to " + user_name);
+                    }
                     PostRefreshGui();
                 }
                 else if (key.equals("loc")) {
                     String message = new String(message_bytes);
                     String[] args = message.split(" ");
                     if (args.length != 4) continue;
-                    int user_id = Integer.parseInt(args[0]);
-                    double lon = Double.parseDouble(args[1]);
-                    double lat = Double.parseDouble(args[2]);
-                    double elev = Double.parseDouble(args[3]);
+                    final int user_id = Integer.parseInt(args[0]);
+                    final double lon = Double.parseDouble(args[1]);
+                    final double lat = Double.parseDouble(args[2]);
+                    final double elev = Double.parseDouble(args[3]);
                     if (!users.containsKey(user_id)) continue;
                     User u = users.get(user_id);
                     u.last_update = Calendar.getInstance().getTime();
@@ -943,35 +958,71 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     u.l.setLatitude(lat);
                     u.l.setAltitude(elev);
                     for (String ch_name : u.channels) {
+                        if (!my_channels.contains(ch_name)) continue;
                         if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                         Channel ch = channels.get(ch_name);
-                        ch.Post(-1, "Server", "User " + u.name + " changed name to " + user_name);
+                        ch.Post(ch_name, -1, "Server", "User " + u.name + " updated location to " + Double.toString(lon) + "," + Double.toString(lat));
                     }
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Marker m = markers.get(user_id);
+                            if (m != null) {
+                                m.setPosition(new LatLng(lat, lon));
+                            }
+                        }
+                    });
                     PostRefreshGui();
                 }
                 else if (key.equals("profile")) {
                     j = Find(message_bytes, ' ');
                     if (j == -1) continue;
                     String user_id_str = MidString(message_bytes, 0, j);
-                    int user_id = Integer.parseInt(user_id_str);
+                    final int user_id = Integer.parseInt(user_id_str);
                     byte[] img = Mid(message_bytes, j+1, message_bytes.length-j-1);
                     StoreImageCache(img);
                     if (users.containsKey(user_id)) {
-                        User u = users.get(user_id);
-                        u.profile_image = BitmapFactory.decodeByteArray(img, 0, img.length);
+                        final User u = users.get(user_id);
+                        Bitmap bm = BitmapFactory.decodeByteArray(img, 0, img.length);
+                        if (bm != null)
+                            u.profile_image = bm;
                         u.profile_image_hash = Hash(img);
                         for (String ch_name : u.channels) {
+                            if (!my_channels.contains(ch_name)) continue;
                             if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                             Channel ch = channels.get(ch_name);
-                            ch.Post(-1, "Server", "User " + u.name + " updated profile image");
+                            ch.Post(ch_name, -1, "Server", "User " + u.name + " updated profile image");
                         }
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Marker m = markers.get(user_id);
+                                if (m != null && u.profile_image != null) {
+                                    boolean fail = true;
+                                    try {
+                                        m.setIcon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(u.profile_image, 128, 128, true))));
+                                        fail = false;
+                                    }
+                                    catch (IllegalArgumentException e) {
+                                        Log.e(TAG, "IllegalArgumentException");
+                                    }
+                                    if (fail) {
+                                        try {
+                                            m.setIcon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(RandomUserImage(), 128, 128, true))));
+                                        } catch (IllegalArgumentException e) {
+                                            Log.e(TAG, "IllegalArgumentException");
+                                        }
+                                    }
+                                }
+                            }
+                        });
                     }
                     PostRefreshGui();
                 }
             }
         }
         catch (IOException e) {
-
+            Log.e(TAG, "Poll: IOEXception");
         }
         finally {
             lock.unlock();
@@ -992,9 +1043,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
                 RefreshUserImage(u);
 
-                if (!channels.containsKey(uj.channel)) continue;
-                Channel ch = channels.get(uj.channel);
-                ch.Post(-1, "Server", "User " + u.name + " joined channel " + uj.channel);
+                String ch_name = uj.channel;
+                if (!channels.containsKey(ch_name)) continue;
+                Channel ch = channels.get(ch_name);
+                ch.Post(ch_name, -1, "Server", "User " + u.name + " joined channel " + uj.channel);
             }
 
             PostRefreshGui();
@@ -1160,6 +1212,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    Bitmap RandomUserImage() {
+        Random rnd = new Random();
+        Bitmap bm = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
+        bm.eraseColor(Color.argb(255, rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256)));
+        return bm;
+    }
+
     void RefreshUserImage(User u) {
         try {
             byte[] image_str;
@@ -1176,7 +1235,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
 
             // Load to memory
-            u.profile_image = BitmapFactory.decodeByteArray(image_str, 0, image_str.length);
+            Bitmap bm = BitmapFactory.decodeByteArray(image_str, 0, image_str.length);
+            if (bm != null)
+                u.profile_image = bm;
+            else {
+                u.profile_image = RandomUserImage();
+            }
         }
         catch (Exc e) {
             Log.e(TAG, "User image refresh failed: " + u.name);
@@ -1228,7 +1292,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Marker m = mMap.addMarker(new MarkerOptions()
                         .title(u.name)
                         .position(loc)
-                        .icon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(u.profile_image))));
+                        .icon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(u.profile_image, 128, 128, true)))));
                 markers.put(user_id, m);
             }
             else {
