@@ -200,7 +200,7 @@ void Client::SetImage(Image i) {
 		else {
 			if (hash != imgstr.GetHashValue()) {
 				try {
-					Set("profile_image", Encode64(imgstr));
+					Set("profile_image", imgstr);
 				}
 				catch (Exc e) {
 					Print("Changing profile image failed");
@@ -564,7 +564,7 @@ void Client::Poll() {
 			if (j == -1) {lock.Leave(); throw Exc("System error");}
 			String user_id_str = message.Left(j);
 			int user_id = ScanInt(user_id_str);
-			message = Decode64(message.Mid(j+1));
+			message = message.Mid(j+1);
 			j = users.Find(user_id);
 			StoreImageCache(message);
 			if (j >= 0) {

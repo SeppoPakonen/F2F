@@ -251,8 +251,8 @@ void Client::Leave(String channel) {
 	Print("Client " + IntStr(id) + " left from channel " + channel);
 }
 
-void Client::Message(int recv_user_id, const String& msg) {
-	if (recv_user_id < 0) return;
+bool Client::Message(int recv_user_id, const String& msg) {
+	if (recv_user_id < 0) return false;
 	StringStream out, in;
 	
 	out.Put32(70);
@@ -264,9 +264,9 @@ void Client::Message(int recv_user_id, const String& msg) {
 	Call(out, in);
 	
 	int ret = in.Get32();
-	if (ret != 0) throw Exc("Message sending failed");
-	
-	Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + IntStr(recv_user_id) + ": " + msg);
+	if (ret == 0)
+		Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + IntStr(recv_user_id) + ": " + msg);
+	return !ret;
 }
 
 void Client::Poll() {
@@ -365,8 +365,8 @@ void Client::SendLocation(const Location& l) {
 	Print("Client " + IntStr(id) + " updated location");
 }
 
-void Client::ChannelMessage(String channel, const String& msg) {
-	if (channel.IsEmpty()) return;
+bool Client::ChannelMessage(String channel, const String& msg) {
+	if (channel.IsEmpty()) return false;
 	StringStream out, in;
 	
 	out.Put32(100);
@@ -379,9 +379,9 @@ void Client::ChannelMessage(String channel, const String& msg) {
 	Call(out, in);
 	
 	int ret = in.Get32();
-	if (ret != 0) throw Exc("Message sending failed");
-	
-	Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + channel + ": " + msg);
+	if (!ret)
+		Print("Client " + IntStr(id) + " sent message from " + IntStr(user_id) + " to " + channel + ": " + msg);
+	return !ret;
 }
 
 void Client::RefreshChannellist() {
@@ -451,7 +451,7 @@ String Client::RandomImage() {
 	ImageBuffer img(128, 128);
 	Fill(img, Size(128, 128), Color(Random(255), Random(255), Random(255)));
 	JPGEncoder jpg;
-	return Encode64(jpg.SaveString(img));
+	return jpg.SaveString(img);
 }
 
 String Client::RandomName() {
@@ -546,7 +546,7 @@ Location Client::NextLocation() {
 
 CONSOLE_APP_MAIN
 {
-	Array<Client> clients;
+	
 	
 	for(int i = 0; i < 10; i++) {
 		Client& c = clients.Add();

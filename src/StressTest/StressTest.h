@@ -60,11 +60,11 @@ public:
 	void Join(String channel);
 	void Leave(String channel);
 	void SendLocation(const Location& elevation);
-	void Message(int recv_user_id, const String& msg);
+	bool Message(int recv_user_id, const String& msg);
 	bool Set(const String& key, const String& value);
 	void Get(const String& key, String& value);
 	void Poll();
-	void ChannelMessage(String channel, const String& msg);
+	bool ChannelMessage(String channel, const String& msg);
 	void RefreshChannellist();
 	void RefreshUserlist();
 	String RandomImage();
