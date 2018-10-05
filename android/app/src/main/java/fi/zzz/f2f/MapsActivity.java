@@ -1046,6 +1046,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 String ch_name = uj.channel;
                 if (!channels.containsKey(ch_name)) continue;
                 Channel ch = channels.get(ch_name);
+                ch.userlist.add(uj.user_id);
                 ch.Post(ch_name, -1, "Server", "User " + u.name + " joined channel " + uj.channel);
             }
 
@@ -1303,6 +1304,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         for (Integer user_id : rem_list) {
             markers.get(user_id).remove();
+            markers.remove(user_id);
         }
 
         lock.unlock();

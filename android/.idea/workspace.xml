@@ -21,7 +21,6 @@
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/classAnalysis.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/classAnalysis.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/javaCompile.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/javaCompile.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/taskHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/taskHistory.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
@@ -52,8 +51,8 @@
       <file leaf-file-name="MapsActivity.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="210">
-              <caret line="1007" column="36" selection-start-line="1007" selection-start-column="36" selection-end-line="1007" selection-end-column="36" />
+            <state relative-caret-position="397">
+              <caret line="1306" column="36" selection-start-line="1306" selection-start-column="36" selection-end-line="1306" selection-end-column="36" />
               <folding>
                 <element signature="imports" expanded="true" />
                 <element signature="e#8025#8401#0" expanded="true" />
@@ -64,6 +63,7 @@
                 <element signature="e#33786#33787#0" expanded="true" />
                 <element signature="e#35300#37024#0" expanded="true" />
                 <element signature="e#37023#37024#0" expanded="true" />
+                <element signature="e#42072#42081#0" expanded="true" />
                 <element signature="e#47064#47065#0" expanded="true" />
                 <element signature="e#47098#47099#0" expanded="true" />
               </folding>
@@ -164,8 +164,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>writeBy</find>
-      <find>output</find>
       <find>ByteBuffer</find>
       <find>putInt</find>
       <find>DataOutputStream</find>
@@ -194,6 +192,8 @@
       <find>marker</find>
       <find>my_marker</find>
       <find>SendLocation</find>
+      <find>join_list</find>
+      <find>userlist</find>
     </findStrings>
   </component>
   <component name="GradleLocalSettings">
@@ -2691,7 +2691,14 @@
       <option name="project" value="LOCAL" />
       <updated>1538659750452</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Bugfixes">
+      <created>1538755835365</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1538755835365</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TodoView">
@@ -2749,7 +2756,8 @@
     <MESSAGE value="Client code conversion from C++ version progressed" />
     <MESSAGE value="Bug identified: fucking java shit doesn't transmit higher 4 bits of byte via socket. Unbelieveable." />
     <MESSAGE value="Use byte array as storage instead of strings, which has encoding" />
-    <option name="LAST_COMMIT_MESSAGE" value="Use byte array as storage instead of strings, which has encoding" />
+    <MESSAGE value="Bugfixes" />
+    <option name="LAST_COMMIT_MESSAGE" value="Bugfixes" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -2852,12 +2860,6 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>539</line>
-          <properties />
-          <option name="timeStamp" value="168" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
           <line>542</line>
           <properties />
           <option name="timeStamp" value="169" />
@@ -2930,43 +2932,43 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1074</line>
+          <line>1075</line>
           <properties />
           <option name="timeStamp" value="181" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1077</line>
+          <line>1078</line>
           <properties />
           <option name="timeStamp" value="182" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1101</line>
+          <line>1102</line>
           <properties />
           <option name="timeStamp" value="183" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1140</line>
+          <line>1141</line>
           <properties />
           <option name="timeStamp" value="184" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1185</line>
+          <line>1186</line>
           <properties />
           <option name="timeStamp" value="185" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1207</line>
+          <line>1208</line>
           <properties />
           <option name="timeStamp" value="186" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1210</line>
+          <line>1211</line>
           <properties />
           <option name="timeStamp" value="187" />
         </line-breakpoint>
@@ -2978,7 +2980,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1245</line>
+          <line>1246</line>
           <properties />
           <option name="timeStamp" value="192" />
         </line-breakpoint>
@@ -2988,8 +2990,14 @@
           <properties />
           <option name="timeStamp" value="205" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
+          <line>1292</line>
+          <properties />
+          <option name="timeStamp" value="219" />
+        </line-breakpoint>
       </breakpoints>
-      <option name="time" value="206" />
+      <option name="time" value="220" />
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
@@ -3041,6 +3049,7 @@
             <element signature="e#33786#33787#0" expanded="true" />
             <element signature="e#35300#37024#0" expanded="true" />
             <element signature="e#37023#37024#0" expanded="true" />
+            <element signature="e#42072#42081#0" expanded="true" />
             <element signature="e#47064#47065#0" expanded="true" />
             <element signature="e#47098#47099#0" expanded="true" />
           </folding>
@@ -3128,6 +3137,7 @@
             <element signature="e#33786#33787#0" expanded="true" />
             <element signature="e#35300#37024#0" expanded="true" />
             <element signature="e#37023#37024#0" expanded="true" />
+            <element signature="e#42072#42081#0" expanded="true" />
             <element signature="e#47064#47065#0" expanded="true" />
             <element signature="e#47098#47099#0" expanded="true" />
           </folding>
@@ -3385,8 +3395,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="210">
-          <caret line="1007" column="36" selection-start-line="1007" selection-start-column="36" selection-end-line="1007" selection-end-column="36" />
+        <state relative-caret-position="397">
+          <caret line="1306" column="36" selection-start-line="1306" selection-start-column="36" selection-end-line="1306" selection-end-column="36" />
           <folding>
             <element signature="imports" expanded="true" />
             <element signature="e#8025#8401#0" expanded="true" />
@@ -3397,6 +3407,7 @@
             <element signature="e#33786#33787#0" expanded="true" />
             <element signature="e#35300#37024#0" expanded="true" />
             <element signature="e#37023#37024#0" expanded="true" />
+            <element signature="e#42072#42081#0" expanded="true" />
             <element signature="e#47064#47065#0" expanded="true" />
             <element signature="e#47098#47099#0" expanded="true" />
           </folding>
