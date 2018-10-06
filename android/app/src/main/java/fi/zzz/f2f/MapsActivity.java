@@ -157,7 +157,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 @Override
                 public void run() {
                     try {
-                        addr = "87.92.111.37";
+                        addr = "93.170.105.68";
                         port = 17000;
                         Connect();
                         RegisterScript();

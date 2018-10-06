@@ -17,15 +17,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" readonly="true" id="10d122a8-dacb-410b-ad86-e97bf1f3f300" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/fileHashes/fileHashes.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/classAnalysis.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/classAnalysis.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/javaCompile/javaCompile.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/javaCompile/javaCompile.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/4.6/taskHistory/taskHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -51,21 +44,27 @@
       <file leaf-file-name="MapsActivity.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="397">
-              <caret line="1306" column="36" selection-start-line="1306" selection-start-column="36" selection-end-line="1306" selection-end-column="36" />
+            <state relative-caret-position="125">
+              <caret line="159" column="45" selection-start-line="159" selection-start-column="45" selection-end-line="159" selection-end-column="45" />
               <folding>
                 <element signature="imports" expanded="true" />
-                <element signature="e#8025#8401#0" expanded="true" />
-                <element signature="e#8400#8401#0" expanded="true" />
-                <element signature="e#11729#11853#0" expanded="true" />
-                <element signature="e#11852#11853#0" expanded="true" />
-                <element signature="e#33440#33787#0" expanded="true" />
-                <element signature="e#33786#33787#0" expanded="true" />
-                <element signature="e#35300#37024#0" expanded="true" />
-                <element signature="e#37023#37024#0" expanded="true" />
-                <element signature="e#42072#42081#0" expanded="true" />
-                <element signature="e#47064#47065#0" expanded="true" />
-                <element signature="e#47098#47099#0" expanded="true" />
+                <element signature="e#4358#5027#0" expanded="true" />
+                <element signature="e#5026#5027#0" expanded="true" />
+                <element signature="e#5998#6553#0" expanded="true" />
+                <element signature="e#6552#6553#0" expanded="true" />
+                <element signature="e#8216#8592#0" expanded="true" />
+                <element signature="e#8591#8592#0" expanded="true" />
+                <element signature="e#11930#12054#0" expanded="true" />
+                <element signature="e#12053#12054#0" expanded="true" />
+                <element signature="e#12121#12252#0" expanded="true" />
+                <element signature="e#12251#12252#0" expanded="true" />
+                <element signature="e#27038#27050#0" expanded="true" />
+                <element signature="e#33665#34012#0" expanded="true" />
+                <element signature="e#34011#34012#0" expanded="true" />
+                <element signature="e#35301#36689#0" expanded="true" />
+                <element signature="e#36688#36689#0" expanded="true" />
+                <element signature="e#39698#39706#0" expanded="true" />
+                <element signature="e#45685#45694#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -175,7 +174,6 @@
       <find>RefreshGuiChannel</find>
       <find>PostRefreshGui</find>
       <find>active_channel</find>
-      <find>Connect</find>
       <find>call_lock</find>
       <find>Join</find>
       <find>Call</find>
@@ -194,6 +192,7 @@
       <find>SendLocation</find>
       <find>join_list</find>
       <find>userlist</find>
+      <find>Connect</find>
     </findStrings>
   </component>
   <component name="GradleLocalSettings">
@@ -2491,8 +2490,8 @@
         </subPane>
       </pane>
       <pane id="PackagesPane" />
-      <pane id="ProjectPane" />
       <pane id="Scope" />
+      <pane id="ProjectPane" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -2698,7 +2697,14 @@
       <option name="project" value="LOCAL" />
       <updated>1538755835365</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Fix marker issues which prevented new markers of re-joining people">
+      <created>1538757149158</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1538757149158</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TodoView">
@@ -2714,7 +2720,7 @@
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info anchor="bottom" id="Android Profiler" order="12" />
+      <window_info anchor="bottom" id="Android Profiler" order="12" show_stripe_button="false" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.32900432" />
       <window_info anchor="right" id="Palette&#9;" order="9" />
       <window_info id="Image Layers" order="7" />
@@ -2734,7 +2740,7 @@
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="right" id="Device File Explorer" order="4" side_tool="true" />
       <window_info anchor="right" id="Theme Preview" order="8" />
-      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.6998934" visible="true" weight="0.39502165" />
+      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.6998934" weight="0.39502165" />
       <window_info id="Favorites" order="5" side_tool="true" />
       <window_info anchor="right" id="Assistant" order="6" visible="true" weight="0.31130064" />
       <window_info anchor="bottom" id="Messages" order="13" weight="0.32896176" />
@@ -2757,7 +2763,8 @@
     <MESSAGE value="Bug identified: fucking java shit doesn't transmit higher 4 bits of byte via socket. Unbelieveable." />
     <MESSAGE value="Use byte array as storage instead of strings, which has encoding" />
     <MESSAGE value="Bugfixes" />
-    <option name="LAST_COMMIT_MESSAGE" value="Bugfixes" />
+    <MESSAGE value="Fix marker issues which prevented new markers of re-joining people" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix marker issues which prevented new markers of re-joining people" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -2990,12 +2997,6 @@
           <properties />
           <option name="timeStamp" value="205" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java</url>
-          <line>1292</line>
-          <properties />
-          <option name="timeStamp" value="219" />
-        </line-breakpoint>
       </breakpoints>
       <option name="time" value="220" />
     </breakpoint-manager>
@@ -3041,17 +3042,23 @@
           <caret line="85" column="49" lean-forward="true" selection-start-line="85" selection-start-column="49" selection-end-line="85" selection-end-column="49" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#8025#8401#0" expanded="true" />
-            <element signature="e#8400#8401#0" expanded="true" />
-            <element signature="e#11729#11853#0" expanded="true" />
-            <element signature="e#11852#11853#0" expanded="true" />
-            <element signature="e#33440#33787#0" expanded="true" />
-            <element signature="e#33786#33787#0" expanded="true" />
-            <element signature="e#35300#37024#0" expanded="true" />
-            <element signature="e#37023#37024#0" expanded="true" />
-            <element signature="e#42072#42081#0" expanded="true" />
-            <element signature="e#47064#47065#0" expanded="true" />
-            <element signature="e#47098#47099#0" expanded="true" />
+            <element signature="e#4358#5027#0" expanded="true" />
+            <element signature="e#5026#5027#0" expanded="true" />
+            <element signature="e#5998#6553#0" expanded="true" />
+            <element signature="e#6552#6553#0" expanded="true" />
+            <element signature="e#8216#8592#0" expanded="true" />
+            <element signature="e#8591#8592#0" expanded="true" />
+            <element signature="e#11930#12054#0" expanded="true" />
+            <element signature="e#12053#12054#0" expanded="true" />
+            <element signature="e#12121#12252#0" expanded="true" />
+            <element signature="e#12251#12252#0" expanded="true" />
+            <element signature="e#27038#27050#0" expanded="true" />
+            <element signature="e#33665#34012#0" expanded="true" />
+            <element signature="e#34011#34012#0" expanded="true" />
+            <element signature="e#35301#36689#0" expanded="true" />
+            <element signature="e#36688#36689#0" expanded="true" />
+            <element signature="e#39698#39706#0" expanded="true" />
+            <element signature="e#45685#45694#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -3129,17 +3136,23 @@
           <caret line="43" column="73" selection-start-line="43" selection-start-column="73" selection-end-line="43" selection-end-column="73" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#8025#8401#0" expanded="true" />
-            <element signature="e#8400#8401#0" expanded="true" />
-            <element signature="e#11729#11853#0" expanded="true" />
-            <element signature="e#11852#11853#0" expanded="true" />
-            <element signature="e#33440#33787#0" expanded="true" />
-            <element signature="e#33786#33787#0" expanded="true" />
-            <element signature="e#35300#37024#0" expanded="true" />
-            <element signature="e#37023#37024#0" expanded="true" />
-            <element signature="e#42072#42081#0" expanded="true" />
-            <element signature="e#47064#47065#0" expanded="true" />
-            <element signature="e#47098#47099#0" expanded="true" />
+            <element signature="e#4358#5027#0" expanded="true" />
+            <element signature="e#5026#5027#0" expanded="true" />
+            <element signature="e#5998#6553#0" expanded="true" />
+            <element signature="e#6552#6553#0" expanded="true" />
+            <element signature="e#8216#8592#0" expanded="true" />
+            <element signature="e#8591#8592#0" expanded="true" />
+            <element signature="e#11930#12054#0" expanded="true" />
+            <element signature="e#12053#12054#0" expanded="true" />
+            <element signature="e#12121#12252#0" expanded="true" />
+            <element signature="e#12251#12252#0" expanded="true" />
+            <element signature="e#27038#27050#0" expanded="true" />
+            <element signature="e#33665#34012#0" expanded="true" />
+            <element signature="e#34011#34012#0" expanded="true" />
+            <element signature="e#35301#36689#0" expanded="true" />
+            <element signature="e#36688#36689#0" expanded="true" />
+            <element signature="e#39698#39706#0" expanded="true" />
+            <element signature="e#45685#45694#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -3395,21 +3408,27 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/java/fi/zzz/f2f/MapsActivity.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="397">
-          <caret line="1306" column="36" selection-start-line="1306" selection-start-column="36" selection-end-line="1306" selection-end-column="36" />
+        <state relative-caret-position="125">
+          <caret line="159" column="45" selection-start-line="159" selection-start-column="45" selection-end-line="159" selection-end-column="45" />
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#8025#8401#0" expanded="true" />
-            <element signature="e#8400#8401#0" expanded="true" />
-            <element signature="e#11729#11853#0" expanded="true" />
-            <element signature="e#11852#11853#0" expanded="true" />
-            <element signature="e#33440#33787#0" expanded="true" />
-            <element signature="e#33786#33787#0" expanded="true" />
-            <element signature="e#35300#37024#0" expanded="true" />
-            <element signature="e#37023#37024#0" expanded="true" />
-            <element signature="e#42072#42081#0" expanded="true" />
-            <element signature="e#47064#47065#0" expanded="true" />
-            <element signature="e#47098#47099#0" expanded="true" />
+            <element signature="e#4358#5027#0" expanded="true" />
+            <element signature="e#5026#5027#0" expanded="true" />
+            <element signature="e#5998#6553#0" expanded="true" />
+            <element signature="e#6552#6553#0" expanded="true" />
+            <element signature="e#8216#8592#0" expanded="true" />
+            <element signature="e#8591#8592#0" expanded="true" />
+            <element signature="e#11930#12054#0" expanded="true" />
+            <element signature="e#12053#12054#0" expanded="true" />
+            <element signature="e#12121#12252#0" expanded="true" />
+            <element signature="e#12251#12252#0" expanded="true" />
+            <element signature="e#27038#27050#0" expanded="true" />
+            <element signature="e#33665#34012#0" expanded="true" />
+            <element signature="e#34011#34012#0" expanded="true" />
+            <element signature="e#35301#36689#0" expanded="true" />
+            <element signature="e#36688#36689#0" expanded="true" />
+            <element signature="e#39698#39706#0" expanded="true" />
+            <element signature="e#45685#45694#0" expanded="true" />
           </folding>
         </state>
       </provider>
