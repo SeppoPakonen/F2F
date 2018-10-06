@@ -546,7 +546,7 @@ Location Client::NextLocation() {
 
 CONSOLE_APP_MAIN
 {
-	
+	Array<Client> clients;
 	
 	for(int i = 0; i < 10; i++) {
 		Client& c = clients.Add();
