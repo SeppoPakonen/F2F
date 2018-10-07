@@ -8,4 +8,6 @@
     <string name="faq">FAQs</string>
     <string name="share">Share this app</string>
     <string name="headertitle">Header title</string>
+    <string name="welcome">Welcome</string>
+    <string name="next">Next</string>
 </resources>

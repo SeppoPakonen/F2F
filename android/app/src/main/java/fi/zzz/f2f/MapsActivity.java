@@ -2,6 +2,7 @@ package fi.zzz.f2f;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -33,6 +34,7 @@ import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.MenuItem;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -70,7 +72,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     public enum Preferencies {
         COMPLETED_ONBOARDING_PREF_NAME
-    };
+    }
 
     // Client code
     private int user_id = -1;
@@ -97,12 +99,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     MapsActivity() {
+        pass = new byte[8];
         call_lock = new ReentrantLock();
         lock = new ReentrantLock();
-        channels = new HashMap<String, Channel>();
-        users = new HashMap<Integer, User>();
-        my_channels = new HashSet<String>();
-        markers = new HashMap<Integer, Marker>();
+        channels = new HashMap<>();
+        users = new HashMap<>();
+        my_channels = new HashSet<>();
+        markers = new HashMap<>();
+
     }
 
     @Override
@@ -110,6 +114,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         try {
             super.onCreate(savedInstanceState);
             setContentView(R.layout.activity_maps);
+
+            //LoadThis();
 
             // Obtain the SupportMapFragment and get notified when the map is ready to be used.
             SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -123,7 +129,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             navigationView.setNavigationItemSelectedListener(
                     new NavigationView.OnNavigationItemSelectedListener() {
                         @Override
-                        public boolean onNavigationItemSelected(MenuItem menuItem) {
+                        public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
                             // set item as selected to persist highlight
                             menuItem.setChecked(true);
                             // close drawer when item is tapped
@@ -145,29 +151,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             // First time user onboarding activity
             // https://developer.android.com/training/tv/playback/onboarding
-            /*SharedPreferences sharedPreferences =
-                    PreferenceManager.getDefaultSharedPreferences(this);
-            // Check if we need to display our OnboardingFragment
-            if (!sharedPreferences.getBoolean(
-                    Preferencies.COMPLETED_ONBOARDING_PREF_NAME, false)) {
+            if (!is_registered) {
                 // The user hasn't seen the OnboardingFragment yet, so show it
                 startActivity(new Intent(this, OnboardingActivity.class));
-            }*/
+            }
+
             Thread thread = new Thread() {
                 @Override
                 public void run() {
-                    try {
-                        addr = "93.170.105.68";
-                        port = 17000;
-                        Connect();
-                        RegisterScript();
-                        LoginScript();
-                        HandleConnection();
-                    }
-                    catch (Exc e) {
-                        Log.e(TAG, "Error: " + e.msg);
-                        System.exit(1);
-                    }
+                    addr = "93.170.105.68";
+                    port = 17000;
+                    Connect();
+                    RegisterScript();
+                    LoginScript();
+                    HandleConnection();
                 }
             };
             thread.start();
@@ -272,20 +269,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     class User {
-        public int user_id = -1;
-        public String name = "";
-        public boolean is_updated = false;
-        public Date last_update;
+        private int user_id = -1;
+        private String name = "";
+        private boolean is_updated = false;
+        private Date last_update;
 
-        public HashSet<String> channels;
-        public Location l;
-        public long profile_image_hash = 0;
-        public int age = 0;
-        public boolean gender = true;
-        public Bitmap profile_image;
+        private HashSet<String> channels;
+        private Location l;
+        private long profile_image_hash = 0;
+        private int age = 0;
+        private boolean gender = true;
+        private Bitmap profile_image;
 
         User() {
-            channels = new HashSet<String>();
+            channels = new HashSet<>();
             l = new Location("");
             last_update = new Date(1970,1,1);
         }
@@ -303,8 +300,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         int unread = 0;
 
         Channel() {
-            messages = new ArrayList<ChannelMessage>();
-            userlist = new HashSet<Integer>();
+            messages = new ArrayList<>();
+            userlist = new HashSet<>();
         }
         void Post(String ch_name, int user_id, String user_name, String msg) {
             ChannelMessage m = new ChannelMessage();
@@ -323,11 +320,34 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     void StoreThis() {
-
+        String cl_file = getApplicationContext().getFilesDir() + "/Client.bin";
+        try {
+            FileOutputStream fout = new FileOutputStream(cl_file );
+            DataOutputStream out = new DataOutputStream(fout);
+            out.writeInt(user_id);
+            out.write(pass);
+            out.writeBoolean(is_registered);
+            fout.close();
+        }
+        catch (IOException e) {
+            Log.e(TAG, "Storing configuration failed");
+        }
     }
 
     void LoadThis() {
-
+        String cl_file = getApplicationContext().getFilesDir() + "/Client.bin";
+        try {
+            pass = new byte[8];
+            FileInputStream fin = new FileInputStream(cl_file );
+            DataInputStream out = new DataInputStream(fin);
+            user_id = out.readInt();
+            out.read(pass);
+            is_registered = out.readBoolean();
+            fin.close();
+        }
+        catch (IOException e) {
+            Log.e(TAG, "Storing configuration failed");
+        }
     }
 
     void PostRefreshGui() {
@@ -378,7 +398,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         return true;
     }
 
-    boolean RegisterScript() throws Exc {
+    boolean RegisterScript() {
         if (!is_registered) {
             try {
                 Register();
@@ -392,7 +412,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         return true;
     }
 
-    boolean LoginScript() throws Exc {
+    boolean LoginScript() {
         if (!is_logged_in) {
             lock.lock();
             users.clear();
@@ -414,7 +434,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     void SetName(String s) {
-        if (user_name == s) return;
+        if (user_name.equals(s)) return;
         try {
             if (Set("name", s))
                 user_name = s;
@@ -650,7 +670,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             in.read(pass_bytes);
             pass = pass_bytes;
 
-            Log.i(TAG, "Client " + Integer.toString(user_id) + " registered (pass " + pass + ")");
+            Log.i(TAG, "Client " + Integer.toString(user_id) + " registered (pass " + new String(pass) + ")");
         }
         catch (IOException e) {
             throw new Exc("Register: IOException");
@@ -675,8 +695,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             in.read(name_bytes);
             user_name = new String(name_bytes);
             age = Swap(in.readInt());
-            gender = Swap(in.readInt()) != 0 ? true : false;
-            Log.i(TAG, "Client " + Integer.toString(user_id) + " logged in (" + Integer.toString(user_id) + "," + pass + ") name: " + user_name);
+            gender = Swap(in.readInt()) != 0;
+            Log.i(TAG, "Client " + Integer.toString(user_id) + " logged in (" + Integer.toString(user_id) + "," + new String(pass) + ") name: " + user_name);
         }
         catch (IOException e) {
             throw new Exc("Register: IOException");
@@ -811,8 +831,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     class UserJoined {
-        public int user_id;
-        public String channel;
+        private int user_id;
+        private String channel;
     }
 
     int Find(byte[] b, int chr) {
@@ -835,7 +855,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     void Poll() throws Exc {
-        List<UserJoined> join_list = new ArrayList<UserJoined>();
+        List<UserJoined> join_list = new ArrayList<>();
 
         lock.lock();
 
@@ -872,10 +892,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     String message = new String(message_bytes);
                     String ch_name = "user" + Integer.toString(sender_id);
                     User u = users.get(sender_id);
-                    if (!my_channels.contains(ch_name)) my_channels.add(ch_name);
+                    my_channels.add(ch_name);
                     if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                     Channel ch = channels.get(ch_name);
-                    if (!ch.userlist.contains(sender_id)) ch.userlist.add(sender_id);
+                    ch.userlist.add(sender_id);
                     ch.Post(ch_name, sender_id, u.name, message);
                     PostRefreshGui();
                 }
@@ -1024,6 +1044,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         catch (IOException e) {
             Log.e(TAG, "Poll: IOEXception");
         }
+        catch (NullPointerException e) {
+            Log.e(TAG, "Poll: NullPointerException");
+        }
         finally {
             lock.unlock();
         }
@@ -1109,11 +1132,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             byte[] channellist_str = Get("channellist");
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(channellist_str));
 
-            HashSet<String> ch_rem = new HashSet<String>();
-            for (String ch_name : my_channels) ch_rem.add(ch_name);
+            HashSet<String> ch_rem = new HashSet<>();
+            ch_rem.addAll(my_channels);
 
             int ch_count = Swap(in.readInt());
-            boolean fail = false;
             for (int i = 0; i < ch_count; i++) {
                 int name_len = Swap(in.readInt());
                 if (name_len <= 0) continue;
@@ -1121,12 +1143,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 in.read(name_bytes);
                 String name = new String(name_bytes);
 
-                if (ch_rem.contains(name)) ch_rem.remove(name);
+                ch_rem.remove(name);
 
-                if (!my_channels.contains(name)) my_channels.add(name);
+                my_channels.add(name);
                 if (!channels.containsKey(name)) channels.put(name, new Channel());
             }
-            if (fail) throw new Exc("Getting channel-list failed");
 
             for (String ch : ch_rem)
                 my_channels.remove(ch);
@@ -1159,7 +1180,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             u.user_id = user_id;
             u.name = name;
             u.age = Swap(in.readInt());
-            u.gender = Swap(in.readInt()) != 0 ? true : false;
+            u.gender = Swap(in.readInt()) != 0;
 
             u.profile_image_hash = Swap(in.readInt()) & 0x00000000ffffffffL;
 
@@ -1175,10 +1196,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 byte[] ch_name_bytes = new byte[ch_name_len];
                 in.read(ch_name_bytes);
                 String ch_name = new String(ch_name_bytes);
-                if (!u.channels.contains(ch_name)) u.channels.add(ch_name);
+                u.channels.add(ch_name);
                 if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                 Channel ch = channels.get(ch_name);
-                if (!ch.userlist.contains(user_id)) ch.userlist.add(user_id);
+                ch.userlist.add(user_id);
             }
 
             return true;
@@ -1196,7 +1217,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             int user_count = Swap(in.readInt());
             boolean fail = false;
             for(int i = 0; i < user_count && !fail; i++) {
-                fail |= !Who(in);
+                fail = fail || !Who(in);
             }
             if (fail) throw new Exc("Getting userlist failed");
 
@@ -1276,10 +1297,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (!channels.containsKey(active_channel)) {lock.unlock(); return;}
 
         Channel ch = channels.get(active_channel);
+        if (ch == null) {lock.unlock(); return;}
 
-        HashSet<Integer> rem_list = new HashSet<Integer>();
-        for (Integer user_id : markers.keySet())
-            rem_list.add(user_id);
+        HashSet<Integer> rem_list = new HashSet<>();
+        rem_list.addAll(markers.keySet());
 
         for (Integer user_id : ch.userlist) {
             rem_list.remove(user_id);
@@ -1298,12 +1319,16 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
             else {
                 Marker m = markers.get(user_id);
-                m.setPosition(loc);
+                if (m != null)
+                    m.setPosition(loc);
             }
         }
 
         for (Integer user_id : rem_list) {
-            markers.get(user_id).remove();
+            try {
+                markers.get(user_id).remove();
+            }
+            catch (NullPointerException e) {}
             markers.remove(user_id);
         }
 
