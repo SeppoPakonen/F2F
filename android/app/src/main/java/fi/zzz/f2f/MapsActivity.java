@@ -146,8 +146,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             mDrawerLayout.closeDrawers();
 
                             int id = menuItem.getItemId();
-                            if (id == R.id.nav_messages) {
-                                Log.i(TAG, "");
+                            if (id == R.id.nav_settings) {
+                                startSettings();
                             }
                             // Add code here to update the UI based on the item selected
                             // For example, swap UI fragments here
@@ -194,6 +194,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+    void startSettings() {
+        startActivity(new Intent(this, SettingsActivity.class));
+    }
+
     void startThread() {
         Thread thread = new Thread() {
             @Override
@@ -205,6 +209,17 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 loginScript();
                 setup();
                 handleConnection();
+            }
+        };
+        thread.start();
+    }
+
+    void applySettings() {
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                storeThis();
+                setup();
             }
         };
         thread.start();
@@ -422,7 +437,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void run() {
                 Toolbar toolbar = findViewById(R.id.toolbar);
-                toolbar.setTitle(s);
+                if (toolbar != null)
+                    toolbar.setTitle(s);
             }
         });
     }
@@ -488,6 +504,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (Exc e) {
                 return false;
             }
+            postSetTitle(getApplicationContext().getResources().getString(R.string.activity_maps));
         }
         return true;
     }
@@ -510,6 +527,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (Exc e) {
                 return false;
             }
+            finally {
+                postSetTitle(getApplicationContext().getResources().getString(R.string.activity_maps));
+            }
         }
         return true;
     }
@@ -520,6 +540,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         setAge(setup_age);
         setGender(setup_gender);
         setImage(profile_image);
+        postSetTitle(getApplicationContext().getResources().getString(R.string.activity_maps));
     }
 
     void setName(String s) {

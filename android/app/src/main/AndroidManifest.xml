@@ -50,6 +50,12 @@
             android:exported="true"
             android:theme="@style/Theme.Leanback.Onboarding">
         </activity>
+
+        <activity
+            android:name=".SettingsActivity"
+            android:enabled="true"
+            android:exported="true">
+        </activity>
     </application>
 
 </manifest>
