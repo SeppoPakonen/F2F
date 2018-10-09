@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">F2F</string>
-    <string name="title_activity_maps">F2F User map</string>
+    <string name="title_activity_maps">F2F</string>
+    <string name="activity_maps">Face-to-face map</string>
     <string name="messages">Messages</string>
     <string name="locshare">Location sharing</string>
     <string name="allinterests">All interests</string>
@@ -10,4 +11,12 @@
     <string name="headertitle">Header title</string>
     <string name="welcome">Welcome</string>
     <string name="next">Next</string>
+    <string name="select_image">Select image</string>
+    <string name="set_name">Name</string>
+    <string name="set_age">Age</string>
+    <string name="set_gender">Gender</string>
+    <string name="connecting">Connecting</string>
+    <string name="registering">Registering</string>
+    <string name="logging_in">Logging in</string>
+    <string name="setupping">Setting up</string>
 </resources>
