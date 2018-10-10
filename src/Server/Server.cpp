@@ -251,109 +251,111 @@ void Server::Data() {
 }
 
 void Server::Listen() {
-	try {
-		if(!listener.Listen(Config::port, 5)) {
-			throw Exc("Unable to initialize server socket!");
-			SetExitCode(1);
-			return;
-		}
-		
-		Print("Registering server to the master server list");
-		TcpSocket master;
-		master.Timeout(10000);
-		if (!master.Connect((String)Config::master_addr, Config::master_port))
-			throw Exc("Unable to connect the master server list");
-		#ifdef flagPOSIX
-		Sleep(1000); // weird bug occurs in linux without this
-		#endif
-		uint16 port = Config::port;
-		int r = master.Put(&port, sizeof(uint16));
-		if (r != sizeof(uint16)) throw Exc("Master server connection failed (1)");
-		
-		bool success = false;
-		for(int i = 0; i < 1000; i++) {
-			TcpSocket verify;
-			verify.Timeout(10000);
-			if (!verify.Accept(listener)) continue;
-			int chk;
-			r = verify.Get(&chk, sizeof(int));
-			if (r != sizeof(int) || chk != 12345678) continue;
-			r = verify.Put(&chk, sizeof(int));
-			if (r != sizeof(int)) continue;
+	while (!Thread::IsShutdownThreads() && running) {
+		try {
+			if(!listener.Listen(Config::port, 5)) {
+				throw Exc("Unable to initialize server socket!");
+				SetExitCode(1);
+				return;
+			}
 			
-			int ret;
-			r = master.Get(&ret, sizeof(int));
-			if (r != sizeof(int)) continue;
-			if (ret != 0) continue;
-			master.Close();
+			Print("Registering server to the master server list");
+			TcpSocket master;
+			master.Timeout(10000);
+			if (!master.Connect((String)Config::master_addr, Config::master_port))
+				throw Exc("Unable to connect the master server list");
+			#ifdef flagPOSIX
+			Sleep(1000); // weird bug occurs in linux without this
+			#endif
+			uint16 port = Config::port;
+			int r = master.Put(&port, sizeof(uint16));
+			if (r != sizeof(uint16)) throw Exc("Master server connection failed (1)");
 			
-			success = true;
-			break;
-		}
-		if (!success) throw Exc("Master server couldn't connect this server");
-		
-		Print("Waiting for requests..");
-		TimeStop ts;
-		while (!Thread::IsShutdownThreads() && running) {
-			One<ActiveSession> ses;
-			ses.Create();
-			ses->server = this;
-			if(ses->s.Accept(listener)) {
-				ses->s.Timeout(30000);
+			bool success = false;
+			for(int i = 0; i < 1000; i++) {
+				TcpSocket verify;
+				verify.Timeout(10000);
+				if (!verify.Accept(listener)) continue;
+				int chk;
+				r = verify.Get(&chk, sizeof(int));
+				if (r != sizeof(int) || chk != 12345678) continue;
+				r = verify.Put(&chk, sizeof(int));
+				if (r != sizeof(int)) continue;
 				
-				// Close blacklisted connections
-				if (blacklist.Find(ses->s.GetPeerAddr()) != -1)
-					ses->s.Close();
-				else {
-					int id = session_counter++;
-					ses->sess_id = id;
+				int ret;
+				r = master.Get(&ret, sizeof(int));
+				if (r != sizeof(int)) continue;
+				if (ret != 0) continue;
+				master.Close();
+				
+				success = true;
+				break;
+			}
+			if (!success) throw Exc("Master server couldn't connect this server");
+			
+			Print("Waiting for requests..");
+			TimeStop ts;
+			while (listener.IsOpen() && !Thread::IsShutdownThreads() && running) {
+				One<ActiveSession> ses;
+				ses.Create();
+				ses->server = this;
+				if(ses->s.Accept(listener)) {
+					ses->s.Timeout(30000);
 					
-					int pre_cmd;
-					ses->s.Get(&pre_cmd, sizeof(int));
-					
-					// Is greeting request
-					if (pre_cmd == 0) {
-						String title = Config::server_title;
-						int i = title.GetCount();
-						ses->s.Put(&i, sizeof(int));
-						ses->s.Put(title.Begin(), title.GetCount());
-						i = sessions.GetCount();
-						ses->s.Put(&i, sizeof(int));
-						i = Config::max_sessions;
-						ses->s.Put(&i, sizeof(int));
+					// Close blacklisted connections
+					if (blacklist.Find(ses->s.GetPeerAddr()) != -1)
 						ses->s.Close();
-					}
-					// Is normal session
-					else if (sessions.GetCount() < Config::max_sessions) {
-						lock.EnterWrite();
-						sessions.Add(id, ses.Detach()).Start();
-						lock.LeaveWrite();
+					else {
+						int id = session_counter++;
+						ses->sess_id = id;
 						
-						if (tabs.Get() == USER_TAB)
-							PostCallback(THISBACK(Data));
+						int pre_cmd;
+						ses->s.Get(&pre_cmd, sizeof(int));
+						
+						// Is greeting request
+						if (pre_cmd == 0) {
+							String title = Config::server_title;
+							int i = title.GetCount();
+							ses->s.Put(&i, sizeof(int));
+							ses->s.Put(title.Begin(), title.GetCount());
+							i = sessions.GetCount();
+							ses->s.Put(&i, sizeof(int));
+							i = Config::max_sessions;
+							ses->s.Put(&i, sizeof(int));
+							ses->s.Close();
+						}
+						// Is normal session
+						else if (sessions.GetCount() < Config::max_sessions) {
+							lock.EnterWrite();
+							sessions.Add(id, ses.Detach()).Start();
+							lock.LeaveWrite();
+							
+							if (tabs.Get() == USER_TAB)
+								PostCallback(THISBACK(Data));
+						}
 					}
 				}
-			}
-			
-			if (ts.Elapsed() > 1000) {
-				lock.EnterWrite();
-				for(int i = 0; i < sessions.GetCount(); i++) {
-					if (!sessions[i].s.IsOpen()) {
-						sessions.Remove(i);
-						i--;
-					}
-				}
-				lock.LeaveWrite();
-				ts.Reset();
 				
-				if (tabs.Get() == USER_TAB)
-					PostCallback(THISBACK(Data));
+				if (ts.Elapsed() > 1000) {
+					lock.EnterWrite();
+					for(int i = 0; i < sessions.GetCount(); i++) {
+						if (!sessions[i].s.IsOpen()) {
+							sessions.Remove(i);
+							i--;
+						}
+					}
+					lock.LeaveWrite();
+					ts.Reset();
+					
+					if (tabs.Get() == USER_TAB)
+						PostCallback(THISBACK(Data));
+				}
 			}
 		}
-	}
-	catch (Exc e) {
-		Print(e);
-		SetExitCode(1);
+		catch (Exc e) {
+			Print(e);
+			Sleep(1000);
+		}
 	}
 	
 	for(int i = 0; i < sessions.GetCount(); i++)
@@ -397,11 +399,14 @@ void Server::JoinChannel(const String& channel, ActiveSession& user) {
 void Server::LeaveChannel(const String& channel, ActiveSession& user) {
 	lock.EnterWrite();
 	int id = channel_ids.GetAdd(channel);
-	Channel& ch = channels.Get(id);
-	ch.users.RemoveKey(user.user_id);
-	user.channels.RemoveKey(id);
-	SendMessage(user.user_id, "leave " + IntStr(user.user_id) + " " + channel, ch.users);
-	UserDatabase& db = GetDatabase(user.user_id);
+	int i = channels.Find(id);
+	if (i != -1) {
+		Channel& ch = channels[i];
+		ch.users.RemoveKey(user.user_id);
+		user.channels.RemoveKey(id);
+		SendMessage(user.user_id, "leave " + IntStr(user.user_id) + " " + channel, ch.users);
+		UserDatabase& db = GetDatabase(user.user_id);
+	}
 	lock.LeaveWrite();
 }
 
@@ -414,7 +419,9 @@ void Server::SendMessage(int sender_id, const String& msg, const Index<int>& use
 		if (user_id == sender_id) continue;
 		int j = user_session_ids.Find(user_id);
 		if (j == -1) continue;
-		ActiveSession& as = sessions.Get(user_session_ids[j]);
+		j = sessions.Find(user_session_ids[j]);
+		if (j == -1) continue;
+		ActiveSession& as = sessions[j];
 		as.lock.Enter();
 		InboxMessage& m = as.inbox.Add();
 		m.sender_id = sender_id;
