@@ -356,7 +356,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
     }
 
-    
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;

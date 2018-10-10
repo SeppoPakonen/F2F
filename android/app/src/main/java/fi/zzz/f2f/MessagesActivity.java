@@ -24,6 +24,8 @@ public class MessagesActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        last_act = this;
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_messages);
 
@@ -47,6 +49,9 @@ public class MessagesActivity extends Activity {
             final Message m = new Message(msg.message, msg.sender_name, "#000000", msg.belongs_to_user, msg.icon);
             messageAdapter.add(m);
         }
+
+        // Scroll to end
+        messagesView.setSelection(messagesView.getCount() - 1);
     }
 
     public void sendMessage(View view) {
