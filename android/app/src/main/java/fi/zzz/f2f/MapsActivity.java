@@ -2,6 +2,7 @@ package fi.zzz.f2f;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -31,11 +32,29 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBar;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.InputType;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.TextView;
+import android.widget.Toast;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -209,6 +228,45 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 loginScript();
                 setup();
                 handleConnection();
+            }
+        };
+        thread.start();
+    }
+
+    void startJoinChannel(final String ch) {
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    joinChannel(ch);
+                    active_channel = ch;
+                    postRefreshGui();
+                }
+                catch (Exc e) {
+
+                }
+            }
+        };
+        thread.start();
+    }
+
+    void startLeaveChannel(final String ch) {
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    leaveChannel(ch);
+                    if (active_channel == ch) {
+                        if (my_channels.isEmpty())
+                            setActiveChannel("");
+                        else
+                            setActiveChannel(my_channels.iterator().next());
+                    }
+                    postRefreshGui();
+                }
+                catch (Exc e) {
+
+                }
             }
         };
         thread.start();
@@ -443,7 +501,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
-    void postrefreshGui() {
+    void postRefreshGui() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -452,7 +510,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
-    void postrefreshGuiChannel() {
+    void postRefreshGuiChannel() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -522,7 +580,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 refreshChannellist();
                 refreshUserlist();
                 is_logged_in = true;
-                postrefreshGui();
+                postRefreshGui();
             }
             catch (Exc e) {
                 return false;
@@ -544,7 +602,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     void setName(String s) {
-        if (user_name.equals(s)) return;
+        if (user_name != null && user_name.equals(s)) return;
         try {
             if (set("name", s.getBytes()))
                 user_name = s;
@@ -678,9 +736,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (IOException e) {
                 Log.e(TAG, "Error: IOException");
             }
+            catch (NullPointerException e) {
+
+            }
 
             is_logged_in = false;
-            try {sock.close();} catch (IOException e) {}
+            try {sock.close();} catch (IOException e) {} catch (NullPointerException e) {}
             sock = null;
         }
 
@@ -713,6 +774,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     DataInputStream call(byte[] out_data) throws Exc {
         byte[] in_data;
         int r;
+
+        if (sock == null)
+            return new DataInputStream(new ByteArrayInputStream(new byte[0]));
 
         call_lock.lock();
         try {
@@ -871,7 +935,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    void join(String channel) throws Exc {
+    void joinChannel(String channel) throws Exc {
         try {
             ByteArrayOutputStream dout = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(dout);
@@ -891,7 +955,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             my_channels.add(channel);
             channels.put(channel, new Channel());
-            postrefreshGui();
+            postRefreshGui();
 
             Log.i(TAG, "Client joined channel " + channel);
         }
@@ -900,7 +964,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    void leave(String channel) throws Exc {
+    void leaveChannel(String channel) throws Exc {
         try {
             ByteArrayOutputStream dout = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(dout);
@@ -915,7 +979,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (ret != 0) throw new Exc("Leaving channel failed)");
 
             my_channels.remove(channel);
-            postrefreshGui();
+            postRefreshGui();
 
             Log.i(TAG, "Client left channel " + channel);
         }
@@ -1013,7 +1077,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     Channel ch = channels.get(ch_name);
                     ch.userlist.add(sender_id);
                     ch.Post(ch_name, sender_id, u.name, message);
-                    postrefreshGui();
+                    postRefreshGui();
                 }
                 else if (key.equals("chmsg")) {
                     if (!users.containsKey(user_id)) continue;
@@ -1025,7 +1089,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                     Channel ch = channels.get(ch_name);
                     ch.Post(ch_name, sender_id, u.name, message);
-                    postrefreshGui();
+                    postRefreshGui();
                 }
                 else if (key.equals("join")) {
                     String message = new String(message_bytes);
@@ -1060,7 +1124,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     ch.Post(ch_name, -1, "Server", "User " + u.name + " left channel " + ch_name);
                     if (u.channels.isEmpty())
                         users.remove(user_id);
-                    postrefreshGui();
+                    postRefreshGui();
                 }
                 else if (key.equals("name")) {
                     String message = new String(message_bytes);
@@ -1077,7 +1141,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Channel ch = channels.get(ch_name);
                         ch.Post(ch_name, -1, "Server", "User " + u.name + " changed name to " + user_name);
                     }
-                    postrefreshGui();
+                    postRefreshGui();
                 }
                 else if (key.equals("loc")) {
                     String message = new String(message_bytes);
@@ -1108,7 +1172,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             }
                         }
                     });
-                    postrefreshGui();
+                    postRefreshGui();
                 }
                 else if (key.equals("profile")) {
                     j = find(message_bytes, ' ');
@@ -1153,7 +1217,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             }
                         });
                     }
-                    postrefreshGui();
+                    postRefreshGui();
                 }
             }
         }
@@ -1189,7 +1253,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 ch.Post(ch_name, -1, "Server", "User " + u.name + " joined channel " + uj.channel);
             }
 
-            postrefreshGui();
+            postRefreshGui();
         }
     }
 
@@ -1270,7 +1334,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             if (!my_channels.isEmpty() && active_channel.isEmpty()) {
                 setActiveChannel(my_channels.iterator().next());
-                postrefreshGuiChannel();
+                postRefreshGuiChannel();
             }
 
             Log.i(TAG, "Client updated channel-list");
@@ -1399,18 +1463,71 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         paint.setAntiAlias(true);
         canvas.drawARGB(0, 0, 0, 0);
         paint.setColor(color);
-        // canvas.drawRoundRect(rectF, roundPx, roundPx, paint);
         canvas.drawCircle(bitmap.getWidth() / 2, bitmap.getHeight() / 2,
                 bitmap.getWidth() / 2, paint);
         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
         canvas.drawBitmap(bitmap, rect, rect, paint);
-        //Bitmap _bmp = Bitmap.createScaledBitmap(output, 60, 60, false);
-        //return _bmp;
         return output;
+    }
+
+
+    void changeChannel(String ch) {
+        Log.i(TAG, "Change channel to " + ch);
+
+        setActiveChannel(ch);
+        postRefreshGui();
     }
 
     void refreshGui() {
         lock.lock();
+
+
+        final RadioGroup channel_list = findViewById(R.id.channel_list);
+        channel_list.removeAllViews();
+        int i = 0;
+        for (String ch : my_channels) {
+            RadioButton rdbtn = new RadioButton(this);
+            rdbtn.setId(i++);
+            rdbtn.setText(ch);
+            channel_list.addView(rdbtn);
+            if (ch == active_channel && !rdbtn.isChecked())
+                rdbtn.setChecked(true);
+        }
+        channel_list.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                RadioButton checkedRadioButton = (RadioButton)group.findViewById(checkedId);
+                if (checkedRadioButton != null) {
+                    checkedRadioButton.setChecked(true);
+                    String ch = checkedRadioButton.getText().toString();
+                    if (ch != active_channel)
+                        changeChannel(ch);
+                }
+            }
+        });
+
+
+
+        Button join_button = findViewById(R.id.join);
+        join_button.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                joinPrompt();
+            }
+        });
+
+
+
+        Button leave_button = findViewById(R.id.leave);
+        leave_button .setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                RadioButton checkedRadioButton = (RadioButton)channel_list.findViewById(channel_list.getCheckedRadioButtonId());
+                if (checkedRadioButton != null) {
+                    String ch = checkedRadioButton.getText().toString();
+                    startLeaveChannel(ch);
+                }
+            }
+        });
+
+
 
         if (!channels.containsKey(active_channel)) {lock.unlock(); return;}
 
@@ -1460,4 +1577,31 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     void setActiveChannel(String s) {
         active_channel = s;
     }
+
+    void joinPrompt() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Join channel");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String channel = input.getText().toString();
+                if (channel.length() > 0)
+                    startJoinChannel(channel);
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
 }

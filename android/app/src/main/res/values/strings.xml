@@ -21,4 +21,6 @@
     <string name="setupping">Setting up</string>
     <string name="save">Save</string>
     <string name="profile_image">Profile image</string>
+    <string name="join">Join</string>
+    <string name="leave">Leave</string>
 </resources>

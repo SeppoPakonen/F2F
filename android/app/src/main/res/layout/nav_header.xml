@@ -1,17 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="192dp"
-    android:background="?attr/colorPrimaryDark"
+    android:layout_height="wrap_content"
+    android:background="?attr/colorPrimary"
     android:padding="16dp"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark"
+    android:theme="@style/ThemeOverlay.AppCompat.Light"
     android:orientation="vertical"
     android:gravity="bottom">
 
-    <TextView
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="20dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <RadioGroup
+            android:id="@+id/channel_list"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+        </RadioGroup>
+    </ScrollView>
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/headertitle"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"/>
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/join"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/join" />
+
+        <Button
+            android:id="@+id/leave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/leave" />
+    </LinearLayout>
 
 </LinearLayout>
