@@ -137,6 +137,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         try {
@@ -167,6 +169,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             int id = menuItem.getItemId();
                             if (id == R.id.nav_settings) {
                                 startSettings();
+                            }
+                            else if (id == R.id.nav_messages) {
+                                startMessages();
                             }
                             // Add code here to update the UI based on the item selected
                             // For example, swap UI fragments here
@@ -213,8 +218,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+    public Channel getActiveChannel() {
+        return channels.get(active_channel);
+    }
     void startSettings() {
         startActivity(new Intent(this, SettingsActivity.class));
+    }
+
+    void startMessages() {
+        startActivity(new Intent(this, MessagesActivity.class));
     }
 
     void startThread() {
@@ -256,7 +268,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             public void run() {
                 try {
                     leaveChannel(ch);
-                    if (active_channel == ch) {
+                    if (active_channel.equals(ch)) {
                         if (my_channels.isEmpty())
                             setActiveChannel("");
                         else
@@ -266,6 +278,21 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
                 catch (Exc e) {
 
+                }
+            }
+        };
+        thread.start();
+    }
+
+    void startSendMessage(final String message) {
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    MapsActivity.last_maps.sendChannelmessage(active_channel, message);
+                }
+                catch (Exc e) {
+                    Log.e(TAG, "Message sending failed");
                 }
             }
         };
@@ -329,23 +356,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
     }
 
-
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
+    
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
         // Add a marker in Sydney and move the camera
         LatLng oulu_uni = new LatLng(65.05919, 25.46748);
-        my_marker = mMap.addMarker(new MarkerOptions().position(oulu_uni).title("Marker in Oulu University"));
+        my_marker = mMap.addMarker(new MarkerOptions().position(oulu_uni).title("Me"));
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(oulu_uni, 16.0f));
         mMap.setIndoorEnabled(true);
 
@@ -386,37 +404,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             cal.set(Calendar.DAY_OF_MONTH, 1);
             last_update = cal.getTime();
         }
-    }
-
-    class ChannelMessage {
-        int sender_id = -1;
-        String message = "", sender_name = "";
-        Date received;
-    }
-
-    class Channel {
-        List<ChannelMessage> messages;
-        HashSet<Integer> userlist;
-        int unread = 0;
-
-        Channel() {
-            messages = new ArrayList<>();
-            userlist = new HashSet<>();
-        }
-        void Post(String ch_name, int user_id, String user_name, String msg) {
-            ChannelMessage m = new ChannelMessage();
-            m.received = Calendar.getInstance().getTime();
-            m.message = msg;
-            m.sender_id = user_id;
-            m.sender_name = user_name;
-            messages.add(m);
-            Log.i(TAG, Integer.toString(user_id) + ", " + user_name + " sent to channel " + ch_name + " message " + msg);
-        }
-    }
-
-    class Exc extends Throwable {
-        String msg;
-        Exc(String s) {msg = s;}
     }
 
     void writeBytes(DataOutputStream s, byte[] b) throws IOException {
@@ -1068,7 +1055,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Log.i(TAG, "Poll " + Integer.toString(i) + ": " + key);
 
                 if (key.equals("msg")) {
-                    if (!users.containsKey(user_id)) continue;
+                    if (!users.containsKey(sender_id)) continue;
                     String message = new String(message_bytes);
                     String ch_name = "user" + Integer.toString(sender_id);
                     User u = users.get(sender_id);
@@ -1076,11 +1063,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                     Channel ch = channels.get(ch_name);
                     ch.userlist.add(sender_id);
-                    ch.Post(ch_name, sender_id, u.name, message);
+                    ch.post(ch_name, sender_id, u.name, message, false, u.profile_image);
                     postRefreshGui();
                 }
                 else if (key.equals("chmsg")) {
-                    if (!users.containsKey(user_id)) continue;
+                    if (!users.containsKey(sender_id)) continue;
                     String message = new String(message_bytes);
                     User u = users.get(sender_id);
                     j = message.indexOf(" ");
@@ -1088,7 +1075,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     message = message.substring(j + 1);
                     if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                     Channel ch = channels.get(ch_name);
-                    ch.Post(ch_name, sender_id, u.name, message);
+                    ch.post(ch_name, sender_id, u.name, message, false, u.profile_image);
                     postRefreshGui();
                 }
                 else if (key.equals("join")) {
@@ -1121,7 +1108,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     if (!channels.containsKey(ch_name)) continue;
                     Channel ch = channels.get(ch_name);
                     ch.userlist.remove(user_id);
-                    ch.Post(ch_name, -1, "Server", "User " + u.name + " left channel " + ch_name);
+                    ch.post(ch_name, -1, "Server", "User " + u.name + " left channel " + ch_name, false, u.profile_image);
                     if (u.channels.isEmpty())
                         users.remove(user_id);
                     postRefreshGui();
@@ -1139,7 +1126,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         if (!my_channels.contains(ch_name)) continue;
                         if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                         Channel ch = channels.get(ch_name);
-                        ch.Post(ch_name, -1, "Server", "User " + u.name + " changed name to " + user_name);
+                        ch.post(ch_name, -1, "Server", "User " + u.name + " changed name to " + user_name, false, u.profile_image);
                     }
                     postRefreshGui();
                 }
@@ -1161,7 +1148,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         if (!my_channels.contains(ch_name)) continue;
                         if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                         Channel ch = channels.get(ch_name);
-                        ch.Post(ch_name, -1, "Server", "User " + u.name + " updated location to " + Double.toString(lon) + "," + Double.toString(lat));
+                        //ch.post(ch_name, -1, "Server", "User " + u.name + " updated location to " + Double.toString(lon) + "," + Double.toString(lat), false, u.profile_image);
                     }
                     runOnUiThread(new Runnable() {
                         @Override
@@ -1191,7 +1178,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             if (!my_channels.contains(ch_name)) continue;
                             if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                             Channel ch = channels.get(ch_name);
-                            ch.Post(ch_name, -1, "Server", "User " + u.name + " updated profile image");
+                            //ch.post(ch_name, -1, "Server", "User " + u.name + " updated profile image", u.profile_image);
                         }
                         runOnUiThread(new Runnable() {
                             @Override
@@ -1250,7 +1237,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (!channels.containsKey(ch_name)) continue;
                 Channel ch = channels.get(ch_name);
                 ch.userlist.add(uj.user_id);
-                ch.Post(ch_name, -1, "Server", "User " + u.name + " joined channel " + uj.channel);
+                ch.post(ch_name, -1, "Server", "User " + u.name + " joined channel " + uj.channel, false, u.profile_image);
             }
 
             postRefreshGui();
@@ -1451,7 +1438,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    public Bitmap getCroppedBitmap(Bitmap bitmap) {
+    static public Bitmap getCroppedBitmap(Bitmap bitmap) {
         Bitmap output = Bitmap.createBitmap(bitmap.getWidth(),
                 bitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
@@ -1490,7 +1477,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             rdbtn.setId(i++);
             rdbtn.setText(ch);
             channel_list.addView(rdbtn);
-            if (ch == active_channel && !rdbtn.isChecked())
+            if (active_channel.equals(ch) && !rdbtn.isChecked())
                 rdbtn.setChecked(true);
         }
         channel_list.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
@@ -1604,4 +1591,52 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         builder.show();
     }
 
+    boolean isActiveChannel(String ch) {return active_channel.equals(ch);}
+
+    String getActiveChannelString() {return active_channel;}
+
 }
+
+
+
+
+class ChannelMessage {
+    int sender_id = -1;
+    String message = "", sender_name = "";
+    Date received;
+    boolean belongs_to_user = false;
+    Bitmap icon;
+}
+
+class Channel {
+    List<ChannelMessage> messages;
+    HashSet<Integer> userlist;
+    int unread = 0;
+
+    Channel() {
+        messages = new ArrayList<>();
+        userlist = new HashSet<>();
+    }
+    void post(String ch_name, int user_id, String user_name, String msg, boolean belongs_to_user, Bitmap icon) {
+        ChannelMessage m = new ChannelMessage();
+        m.received = Calendar.getInstance().getTime();
+        m.message = msg;
+        m.sender_id = user_id;
+        m.sender_name = user_name;
+        m.belongs_to_user = belongs_to_user;
+        m.icon = icon;
+        messages.add(m);
+        Log.i("Channel", Integer.toString(user_id) + ", " + user_name + " sent to channel " + ch_name + " message " + msg);
+
+        if (MapsActivity.last_maps.isActiveChannel(ch_name)) {
+            if (MessagesActivity.last_act != null)
+                MessagesActivity.last_act.gotMessage(user_name, msg, icon);
+        }
+    }
+}
+
+class Exc extends Throwable {
+    String msg;
+    Exc(String s) {msg = s;}
+}
+
