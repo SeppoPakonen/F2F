@@ -4,11 +4,11 @@
 #include <CtrlLib/CtrlLib.h>
 using namespace Upp;
 
-#define LAYOUTFILE <Client/GoogleMaps.lay>
+#define LAYOUTFILE <MapCtrl/GoogleMaps.lay>
 #include <CtrlCore/lay.h>
 
 #define IMAGECLASS GoogleMapsImg
-#define IMAGEFILE <Client/GoogleMaps.iml>
+#define IMAGEFILE <MapCtrl/GoogleMaps.iml>
 #include <Draw/iml_header.h>
 
 void   SetGoogleMapsKey(const char *key);
@@ -36,6 +36,7 @@ struct MapImage : public Ctrl {
 	Point  home;
 	Vector<Pointf> persons;
 	Vector<Image> images;
+	Image overlay;
 	
 	Callback1<Point> WhenLeftClick;
 	
@@ -62,6 +63,8 @@ struct MapImage : public Ctrl {
 			Point p = GoogleMapsImg::Pin().GetHotSpot();
 			w.DrawImage(home.x - p.x, home.y - p.y, GoogleMapsImg::Pin());
 		}
+		if (!overlay.IsEmpty())
+			w.DrawImage(0, 0, overlay);
 	}
 	
 	MapImage() { SetFrame(ViewFrame()); BackPaint(); }
@@ -91,6 +94,7 @@ struct MapDlgDlg : public WithMapDlgLayout<TopWindow> {
 	MapDlgDlg();
 	
 	Callback1<Pointf> WhenHome;
+	Callback WhenMove;
 	
 };
 

@@ -1,0 +1,8 @@
+file
+	MapCtrl.h,
+	GoogleMaps.h,
+	GoogleMaps.cpp,
+	GoogleMaps.iml,
+	GoogleMaps.lay,
+	MapDlg.cpp;
+

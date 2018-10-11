@@ -2,6 +2,7 @@
 #define _Server_Server_h_
 
 #include <CtrlLib/CtrlLib.h>
+#include <MapCtrl/MapCtrl.h>
 using namespace Upp;
 
 #include "BotClient.h"
@@ -22,6 +23,7 @@ extern IniInt master_port;
 };
 
 String RandomPassword(int length);
+void DrawRect(ImageBuffer& ib, Rect r, RGBA rgba);
 
 enum {
 	NICK,
@@ -58,6 +60,7 @@ class UserDatabase {
 	
 protected:
 	friend class ActiveSession;
+	friend class Server;
 	
 	// Temporary
 	Mutex lock;
@@ -90,6 +93,10 @@ public:
 	void Serialize(Stream& s) {s % sessions % name % profile_img % profile_img_hash % channels % passhash % age % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate % gender;}
 	void Flush();
 	void SetLocation(double longitude, double latitude, double elevation);
+};
+
+struct Line : Moveable<Line> {
+	Pointf a, b;
 };
 
 enum {
@@ -156,6 +163,7 @@ public:
 	void Run();
 	void Start() {Thread::Start(THISBACK(Run));}
 	void Stop() {s.Close();}
+	
 	void GetUserlist(Index<int>& userlist);
 	void StoreImageCache(unsigned hash, const String& image_str);
 	
@@ -225,7 +233,11 @@ protected:
 	
 	ArrayCtrl serverlog;
 	
-	enum {USER_TAB, SRVLOG_TAB};
+	ArrayCtrl analyze_chlist;
+	MapDlgDlg analyze_mapctrl;
+	ParentCtrl analyzectrl;
+	
+	enum {USER_TAB, SRVLOG_TAB, ANAL_TAB};
 	TabCtrl tabs;
 	
 public:
@@ -242,6 +254,8 @@ public:
 	void AddBots();
 	void RemoveBots();
 	void CloseSession();
+	void Analyze(String ch);
+	void ChangeLocation();
 	
 	void Print(const String& s);
 	void Data();

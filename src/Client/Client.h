@@ -2,7 +2,7 @@
 #define _Client_Client_h
 
 #include <CtrlLib/CtrlLib.h>
-#include "GoogleMaps.h"
+#include <MapCtrl/MapCtrl.h>
 using namespace Upp;
 
 #define LAYOUTFILE <Client/Client.lay>

@@ -1,7 +1,8 @@
 uses
 	CtrlLib,
 	plugin/gif,
-	plugin/jpg;
+	plugin/jpg,
+	MapCtrl;
 
 library(WIN32) "ssleay32MT libeay32MT";
 
@@ -12,12 +13,7 @@ file
 	Client.h,
 	Client.cpp,
 	Client.lay,
-	Client.iml,
-	GoogleMaps.h,
-	GoogleMaps.cpp,
-	GoogleMaps.lay,
-	GoogleMaps.iml,
-	MapDlg.cpp;
+	Client.iml;
 
 mainconfig
 	"" = "GUI";

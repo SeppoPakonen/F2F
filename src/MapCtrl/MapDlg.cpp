@@ -1,7 +1,7 @@
-#include "Client.h"
+#include "GoogleMaps.h"
 
 #define IMAGECLASS GoogleMapsImg
-#define IMAGEFILE <Client/GoogleMaps.iml>
+#define IMAGEFILE <MapCtrl/GoogleMaps.iml>
 #include <Draw/iml_source.h>
 
 
@@ -16,6 +16,20 @@ void MapDlgDlg::SetHome()
 void MapDlgDlg::LoadMap()
 {
 	map.map = GetGoogleMapImage(center.x, center.y, ~zoom, 640, 640, "png", &map.error);
+	
+	// (try to) Fix transparency
+	/*ImageBuffer ib(map.map.GetSize());
+	const RGBA* src = map.map.Begin();
+	RGBA* it = ib.Begin();
+	RGBA* end = ib.End();
+	while (it != end) {
+		*it = *src;
+		it->a = 255;
+		src++;
+		it++;
+	}
+	map.map = ib;*/
+	
 	SetHome();
 }
 
@@ -23,6 +37,7 @@ void MapDlgDlg::Move(int x, int y)
 {
 	center = GoogleMapsPixelToGps(center, ~zoom, Point(250 * x, 250 * y));
 	LoadMap();
+	WhenMove();
 }
 
 void MapDlgDlg::MapClick(Point p)

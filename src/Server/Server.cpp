@@ -63,11 +63,19 @@ Server::Server() {
 	split.SetPos(5000, 1);
 	split.Horz();
 	tabs.Add(split.SizePos(), "Users");
-	tabs.Add(serverlog.SizePos(), "Server log");
 	
 	serverlog.AddColumn("Time");
 	serverlog.AddColumn("Message");
 	serverlog.ColumnWidths("1 6");
+	tabs.Add(serverlog.SizePos(), "Server log");
+	
+	analyzectrl.Add(analyze_chlist.VSizePos().LeftPos(0, 150));
+	analyzectrl.Add(analyze_mapctrl.VSizePos().HSizePos(150));
+	analyze_chlist.AddColumn("Channel");
+	analyze_chlist <<= THISBACK(ChangeLocation);
+	analyze_mapctrl.Set(Pointf(25.46748, 65.05919));
+	analyze_mapctrl.WhenMove << THISBACK(ChangeLocation);
+	tabs.Add(analyzectrl.SizePos(), "Analyze");
 	
 	Add(tabs.SizePos());
 	tabs.WhenSet << THISBACK(Data);
@@ -92,6 +100,8 @@ void Server::MainMenu(Bar& bar) {
 		bar.Add("Remove bots", THISBACK(RemoveBots));
 		bar.Separator();
 		bar.Add("Close session connection", THISBACK(CloseSession)).Key(K_CTRL|K_C);
+		bar.Separator();
+		bar.Add("Analyze", THISBACK(ChangeLocation)).Key(K_CTRL|K_A);
 	});
 }
 
@@ -246,6 +256,12 @@ void Server::Data() {
 			serverlog.Set(i, 1, l.msg);
 		}
 		serverlog.ScrollEnd();
+	}
+	else if (tab == ANAL_TAB) {
+		for(int i = 0; i < channels.GetCount(); i++) {
+			analyze_chlist.Set(i, 0, channels[i].name);
+		}
+		
 	}
 	
 }
@@ -481,5 +497,182 @@ void Server::DecReference(MessageRef& ref) {
 	}
 }
 
+bool IsLineIntersection (
+	double Ax, double Ay,
+	double Bx, double By,
+	double Cx, double Cy,
+	double Dx, double Dy,
+	double &X, double &Y) {
+	
+	double  distAB, theCos, theSin, newX, ABpos ;
+	
+	//  Fail if either line is undefined.
+	if (Ax==Bx && Ay==By || Cx==Dx && Cy==Dy) return false;
+	
+	//  (1) Translate the system so that point A is on the origin.
+	Bx-=Ax; By-=Ay;
+	Cx-=Ax; Cy-=Ay;
+	Dx-=Ax; Dy-=Ay;
+	
+	//  Discover the length of segment A-B.
+	distAB=sqrt(Bx*Bx+By*By);
+	
+	//  (2) Rotate the system so that point B is on the positive X axis.
+	theCos=Bx/distAB;
+	theSin=By/distAB;
+	newX=Cx*theCos+Cy*theSin;
+	Cy  =Cy*theCos-Cx*theSin; Cx=newX;
+	newX=Dx*theCos+Dy*theSin;
+	Dy  =Dy*theCos-Dx*theSin; Dx=newX;
+	
+	//  Fail if the lines are parallel.
+	if (Cy==Dy) return false;
+	
+	//  (3) Discover the position of the intersection point along line A-B.
+	ABpos=Dx+(Cx-Dx)*Dy/(Dy-Cy);
+	
+	//  (4) Apply the discovered position to line A-B in the original coordinate system.
+	X=Ax+ABpos*theCos;
+	Y=Ay+ABpos*theSin;
+	
+	//  Success.
+	return true;
+}
 
+void Server::ChangeLocation() {
+	
+	int i = analyze_chlist.GetCursor();
+	if (i >= 0 && i < analyze_chlist.GetCount()) {
+		String ch = analyze_chlist.Get(i, 0);
+		Analyze(ch);
+	}
+}
+
+void Server::Analyze(String ch) {
+	
+	Vector<Vector<Line> > routes;
+	
+	int user_count = db.GetUserCount();
+	for(int i = 0; i < user_count; i++) {
+		Vector<Line>& user_routes = routes.Add();
+		
+		UserDatabase& db0 = GetDatabase(i);
+		if (db0.channels.Find(ch) == -1) continue;
+		
+		db0.lock.Enter();
+		
+		int loc_count = db0.location.GetSize() / (3*sizeof(double) + sizeof(Time));
+		db0.location.Seek(0);
+		int j = 0;
+		double prev_lon, prev_lat;
+		while (!db0.location.IsEof()) {
+			double lon, lat, elev;
+			Time t;
+			db0.location.Get(&lon, sizeof(double));
+			db0.location.Get(&lat, sizeof(double));
+			db0.location.Get(&elev, sizeof(double));
+			db0.location.Get(&t, sizeof(Time));
+			
+			if (j > 0 &&
+				prev_lon >= -180 && prev_lon < +180 &&
+				lon >= -180 && lon < +180 &&
+				prev_lat >= -90 && prev_lat < +90 &&
+				lat >= -90 && lat < +90) {
+				Line& l = user_routes.Add();
+				l.a.x = prev_lon;
+				l.a.y = prev_lat;
+				l.b.x = lon;
+				l.b.y = lat;
+			}
+			prev_lon = lon;
+			prev_lat = lat;
+			j++;
+		}
+		
+		db0.lock.Leave();
+	}
+	
+	Vector<Vector<Pointf> > intersections;
+	Vector<Pointf> all_intersections;
+	for(int i = 0; i < user_count; i++) {
+		Vector<Pointf>& user_intersections = intersections.Add();
+		
+		Vector<Line>& user_routes0 = routes[i];
+		
+		for(int j = i+1; j < user_count; j++) {
+			Vector<Line>& user_routes1 = routes[j];
+			
+			for (int k0 = 0; k0 < user_routes0.GetCount(); k0++) {
+				const Line& l0 = user_routes0[k0];
+				for (int k1 = 0; k1 < user_routes1.GetCount(); k1++) {
+					const Line& l1 = user_routes1[k1];
+					
+					Pointf intersection;
+					
+					if (IsLineIntersection(l0.a.x, l0.a.y, l0.b.x, l0.b.y, l1.a.x, l1.a.y, l1.b.x, l1.b.y, intersection.x, intersection.y)) {
+						user_intersections.Add(intersection);
+						all_intersections.Add(intersection);
+					}
+				}
+			}
+		}
+	}
+	
+	Pointf tl, br;
+	tl = GoogleMapsPixelToGps(analyze_mapctrl.center, (int)~analyze_mapctrl.zoom, Size(640,640), Point(0,0));
+	br = GoogleMapsPixelToGps(analyze_mapctrl.center, (int)~analyze_mapctrl.zoom, Size(640,640), Point(640,640));
+	ImageBuffer ib(640, 640);
+	int div = 80;
+	Vector<int> sum;
+	sum.SetCount(div * div, 0);
+	int max = 0;
+	for(int i = 0; i < all_intersections.GetCount(); i++) {
+		const Pointf& p = all_intersections[i];
+		if (p.x > tl.x && p.x < br.x && p.y < tl.y && p.y > br.y) {
+			Pointf p2 = p - tl;
+			p2.x /= br.x - tl.x;
+			p2.y /= br.y - tl.y;
+			p2.x *= div;
+			p2.y *= div;
+			int& j = sum[(int)p2.x + (int)p2.y * div];
+			j++;
+			if (j > max) max = j;
+		}
+	}
+	
+	if (max > 0) {
+		double step = 640.0 / div;
+		for(int xi = 0; xi < div; xi++) {
+			for(int yi = 0; yi < div; yi++) {
+				int l = xi * step;
+				int r = (xi + 1) * step;
+				int t = yi * step;
+				int b = (yi + 1) * step;
+				int a = sum[xi + yi * div] * 128 / max;
+				RGBA c;
+				c.r = 255;
+				c.g = 1;
+				c.b = 1;
+				c.a = a;
+				DrawRect(ib, Rect(l, t, r, b), c);
+			}
+		}
+	}
+	
+	analyze_mapctrl.map.overlay = ib;
+	analyze_mapctrl.map.Refresh();
+}
+
+void DrawRect(ImageBuffer& ib, Rect r, RGBA rgba) {
+	RGBA* begin = ib.Begin();
+	int w = r.GetWidth();
+	int h = r.GetHeight();
+	for(int i = 0; i < h; i++) {
+		RGBA* cur = begin + (r.top + i) * ib.GetWidth() + r.left;
+		for(int j = 0; j < w; j++) {
+			*cur = rgba;
+			cur++;
+		}
+	}
+}
 
