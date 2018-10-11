@@ -24,4 +24,8 @@
     <string name="join">Join</string>
     <string name="leave">Leave</string>
     <string name="input_placeholder">Write a message</string>
+
+
+
+    <string name="privacypolicy">Privacy policy</string>
 </resources>
