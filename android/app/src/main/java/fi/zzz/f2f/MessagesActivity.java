@@ -35,6 +35,10 @@ public class MessagesActivity extends Activity {
         messagesView = (ListView) findViewById(R.id.messages_view);
         messagesView.setAdapter(messageAdapter);
 
+        postAddMessages();
+    }
+
+    void postAddMessages() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {

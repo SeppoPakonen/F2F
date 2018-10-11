@@ -227,6 +227,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     void startMessages() {
         startActivity(new Intent(this, MessagesActivity.class));
+        if (MessagesActivity.last_act != null)
+            MessagesActivity.last_act.postAddMessages();
     }
 
     void startThread() {
@@ -297,6 +299,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         };
         thread.start();
+
+        Channel ch = channels.get(active_channel);
+        if (ch != null) {
+            ch.post(active_channel, user_id, user_name, message, true, null);
+        }
     }
 
     void applySettings() {
@@ -1628,7 +1635,7 @@ class Channel {
         messages.add(m);
         Log.i("Channel", Integer.toString(user_id) + ", " + user_name + " sent to channel " + ch_name + " message " + msg);
 
-        if (MapsActivity.last_maps.isActiveChannel(ch_name)) {
+        if (MapsActivity.last_maps.isActiveChannel(ch_name) && belongs_to_user == false) {
             if (MessagesActivity.last_act != null)
                 MessagesActivity.last_act.gotMessage(user_name, msg, icon);
         }
