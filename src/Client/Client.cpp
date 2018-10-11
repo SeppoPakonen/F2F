@@ -1015,7 +1015,7 @@ void ChannelList::Layout() {
 }
 
 void ChannelList::SetChannelCount(int count) {
-	for(int i = buttons.GetCount()-1; i > count; i--) {
+	for(int i = buttons.GetCount()-1; i >= count; i--) {
 		RemoveChild(&buttons[i]);
 		buttons.Remove(i);
 	}
