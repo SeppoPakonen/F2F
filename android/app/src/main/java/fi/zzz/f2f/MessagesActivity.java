@@ -14,17 +14,17 @@ public class MessagesActivity extends Activity {
     private MessageAdapter messageAdapter;
     private ListView messagesView;
 
-    public static MessagesActivity last_act;
+    public static MessagesActivity last;
 
     public MessagesActivity() {
-        last_act = this;
+        last = this;
 
     }
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        last_act = this;
+        last = this;
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_messages);
@@ -42,15 +42,17 @@ public class MessagesActivity extends Activity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                addMessages();
+                MapsActivity.last.startAddMessages();
             }
         });
     }
 
-    void addMessages() {
-        Channel ch = MapsActivity.last_maps.getActiveChannel();
+    void addMessages(Channel ch) {
+        if (messagesView.getCount() != 0)
+            return;
+        //Channel ch = AppService.last.getActiveChannel();
         for (ChannelMessage msg : ch.messages) {
-            final Message m = new Message(msg.message, msg.sender_name, "#000000", msg.belongs_to_user, msg.icon);
+            final GuiMessage m = new GuiMessage(msg.message, msg.sender_name, "#000000", msg.belongs_to_user, msg.icon);
             messageAdapter.add(m);
         }
 
@@ -67,7 +69,7 @@ public class MessagesActivity extends Activity {
 
             // since the message body is a simple string in our case we can use json.asText() to parse it as such
             // if it was instead an object we could use a similar pattern to data parsing
-            final Message msg = new Message(message, "Me", "#FF0000", true, null);
+            final GuiMessage msg = new GuiMessage(message, "Me", "#FF0000", true, null);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -77,12 +79,12 @@ public class MessagesActivity extends Activity {
                 }
             });
 
-            MapsActivity.last_maps.startSendMessage(message);
+            MapsActivity.last.startSendMessage(message);
         }
     }
 
     public void gotMessage(String sender, String message, Bitmap icon) {
-        final Message msg = new Message(message, sender, "#0000FF", false, icon);
+        final GuiMessage msg = new GuiMessage(message, sender, "#0000FF", false, icon);
         runOnUiThread(new Runnable() {
             @Override
             public void run() {

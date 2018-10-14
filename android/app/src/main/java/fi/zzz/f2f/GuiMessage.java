@@ -3,7 +3,7 @@ package fi.zzz.f2f;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 
-public class Message {
+public class GuiMessage {
     private String text; // message body
     private MemberData data; // data of the user that sent this message
     private boolean belongsToCurrentUser; // is this message sent by us?
@@ -17,7 +17,7 @@ public class Message {
 
     }
 
-    public Message(String text, String name, String color, boolean belongsToCurrentUser, Bitmap icon) {
+    public GuiMessage(String text, String name, String color, boolean belongsToCurrentUser, Bitmap icon) {
         this.text = text;
         this.name = name;
         this.color = color;

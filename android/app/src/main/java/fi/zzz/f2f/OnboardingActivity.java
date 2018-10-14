@@ -21,7 +21,7 @@ public class OnboardingActivity extends Activity {
     public static final int PICK_IMAGE = 1;
 
     public OnboardingActivity() {
-        MapsActivity.profile_image = MapsActivity.randomUserImage();
+        AppService.profile_image = AppService.randomUserImage();
 
     }
 
@@ -108,7 +108,7 @@ public class OnboardingActivity extends Activity {
         });
 
         AppCompatImageView view = findViewById(R.id.profile_image_view);
-        view.setImageBitmap(MapsActivity.profile_image);
+        view.setImageBitmap(AppService.profile_image);
 
     }
 
@@ -129,11 +129,7 @@ public class OnboardingActivity extends Activity {
 
                 String name_str = edit_name.getText().toString();
                 String age_str = edit_age.getText().toString();
-                MapsActivity.last_maps.setup_name = name_str;
-                MapsActivity.last_maps.setup_age = Integer.parseInt(age_str);
-                MapsActivity.last_maps.setup_gender = edit_gender.getSelectedItemPosition() != 0;
-                MapsActivity.last_maps.storeThis();
-                MapsActivity.last_maps.startThread();
+                MapsActivity.last.setupFinish(name_str, Integer.parseInt(age_str), edit_gender.getSelectedItemPosition() != 0);
                 finish();
             }
         });
@@ -149,7 +145,7 @@ public class OnboardingActivity extends Activity {
                 AppCompatImageView view = findViewById(R.id.profile_image_view);
                 view.setImageBitmap(img);
 
-                MapsActivity.last_maps.profile_image = img;
+                MapsActivity.last.startSetProfileImage(img);
             }
             catch (FileNotFoundException e) {
 

@@ -17,14 +17,14 @@ import java.util.List;
 
 public class MessageAdapter extends BaseAdapter {
 
-    List<Message> messages = new ArrayList<Message>();
+    List<GuiMessage> messages = new ArrayList<GuiMessage>();
     Context context;
 
     public MessageAdapter(Context context) {
         this.context = context;
     }
 
-    public void add(Message message) {
+    public void add(GuiMessage message) {
         this.messages.add(message);
         notifyDataSetChanged(); // to render the list we need to notify
     }
@@ -49,7 +49,7 @@ public class MessageAdapter extends BaseAdapter {
     public View getView(int i, View convertView, ViewGroup viewGroup) {
         MessageViewHolder holder = new MessageViewHolder();
         LayoutInflater messageInflater = (LayoutInflater) context.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
-        Message message = messages.get(i);
+        GuiMessage message = messages.get(i);
 
         if (message.isBelongsToCurrentUser()) { // this message was sent by us so let's create a basic chat bubble on the right
             convertView = messageInflater.inflate(R.layout.my_message, null);
