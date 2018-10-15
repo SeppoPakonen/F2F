@@ -99,6 +99,7 @@ public class AppService extends Service {
     public String addr;
     public String active_channel = "";
     public Socket sock;
+    public double prev_lon = 0, prev_lat = 0, prev_alt = 0;
     public int port = 17000;
     public int age = 0;
     public boolean gender = true;
@@ -1207,15 +1208,23 @@ public class AppService extends Service {
 
             out.writeInt(swap(90));
 
-            out.writeDouble(swapDouble(l.getLatitude()));
-            out.writeDouble(swapDouble(l.getLongitude()));
-            out.writeDouble(swapDouble(l.getAltitude()));
+            double lat = l.getLatitude();
+            double lon = l.getLongitude();
+            double alt = l.getAltitude();
+            if (lat != prev_lat || lon != prev_lon || alt != prev_alt) {
+                prev_lat = lat;
+                prev_lon = lon;
+                prev_alt = alt;
 
-            DataInputStream in = call(dout.toByteArray());
+                out.writeDouble(swapDouble(lat));
+                out.writeDouble(swapDouble(lon));
+                out.writeDouble(swapDouble(alt));
 
-            int ret = swap(in.readInt());
-            if (ret != 0) throw new Exc("Updating location failed)");
+                DataInputStream in = call(dout.toByteArray());
 
+                int ret = swap(in.readInt());
+                if (ret != 0) throw new Exc("Updating location failed)");
+            }
             Log.i(TAG, "Client updated location ");
         }
         catch (IOException e) {
