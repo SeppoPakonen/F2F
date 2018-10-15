@@ -3,19 +3,27 @@ package fi.zzz.f2f;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+
+import com.google.android.gms.maps.model.LatLng;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -40,9 +48,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static android.content.Intent.ACTION_MAIN;
 
 
 public class AppService extends Service {
@@ -178,11 +189,22 @@ public class AppService extends Service {
         }
     }
 
+    Timer myTimer = new Timer("MyTimer", true);
+
+    private class MyTask extends TimerTask {
+        public void run(){
+            dummyMethod();
+        }
+    }
+
 
     public AppService() {
         last = this;
+        //myTimer.scheduleAtFixedRate(new MyTask(), 0, 1000);
+    }
 
-
+    void dummyMethod() {
+        Log.i(TAG, "Dummy method");
     }
 
     @Override
@@ -214,24 +236,66 @@ public class AppService extends Service {
 
         loadThis();
 
-        //startForeground(12345678, getNotification());
+        startServiceWithNotification();
+        startLocationService();
 
         super.onCreate();
     }
 
-    /*private Notification getNotification() {
-        NotificationChannel channel = new NotificationChannel(
-                "channel_01",
-                "My Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
-        );
-        NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.createNotificationChannel(channel);
-        Notification.Builder builder = new Notification.Builder(getApplicationContext(), "channel_01");
+    void startServiceWithNotification() {
+        Intent notificationIntent = new Intent(getApplicationContext(), MapsActivity.class);
+        notificationIntent.setAction(ACTION_MAIN);  // A string containing the action name
+        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
-        return builder.build();
-    }*/
+        Bitmap icon = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
 
+        Notification notification = new NotificationCompat.Builder(this)
+                .setContentTitle(getResources().getString(R.string.app_name))
+                .setTicker(getResources().getString(R.string.face_to_face))
+                .setContentText(getResources().getString(R.string.content_text))
+                .setSmallIcon(R.drawable.ic_forum_black_24dp)
+                .setLargeIcon(Bitmap.createScaledBitmap(icon, 128, 128, false))
+                .setContentIntent(contentPendingIntent)
+                .setOngoing(true)
+//                .setDeleteIntent(contentPendingIntent)  // if needed
+                .build();
+        notification.flags = notification.flags | Notification.FLAG_NO_CLEAR;     // NO_CLEAR makes the notification stay when the user performs a "delete all" command
+        startForeground(14125345, notification);
+    }
+
+    void startLocationService() {
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        // Define a listener that responds to location updates
+        LocationListener locationListener = new LocationListener() {
+            public void onLocationChanged(final Location location) {
+
+                // Called when a new location is found by the network location provider.
+                Thread thread = new Thread() {
+                    @Override
+                    public void run() {
+                        try {
+                            sendLocation(location);
+                        }
+                        catch (Exc e) {
+
+                        }
+                    }
+                };
+                thread.start();
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            public void onProviderEnabled(String provider) {}
+
+            public void onProviderDisabled(String provider) {}
+        };
+
+        // Register the listener with the Location Manager to receive location updates
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+    }
     void handleRegister() {
         // First time user onboarding activity
         // https://developer.android.com/training/tv/playback/onboarding
