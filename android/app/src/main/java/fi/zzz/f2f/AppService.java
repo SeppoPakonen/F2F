@@ -1,8 +1,6 @@
 package fi.zzz.f2f;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -21,9 +19,6 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-
-import com.google.android.gms.maps.model.LatLng;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -40,7 +35,6 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -48,8 +42,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -190,18 +182,9 @@ public class AppService extends Service {
         }
     }
 
-    Timer myTimer = new Timer("MyTimer", true);
-
-    private class MyTask extends TimerTask {
-        public void run(){
-            dummyMethod();
-        }
-    }
-
 
     public AppService() {
         last = this;
-        //myTimer.scheduleAtFixedRate(new MyTask(), 0, 1000);
     }
 
     void dummyMethod() {
@@ -297,11 +280,10 @@ public class AppService extends Service {
         // Register the listener with the Location Manager to receive location updates
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
     }
+
+
     void handleRegister() {
-        // First time user onboarding activity
-        // https://developer.android.com/training/tv/playback/onboarding
         if (!is_registered) {
-            // The user hasn't seen the OnboardingFragment yet, so show it
             sendStartOnboarding();
         }
         else {

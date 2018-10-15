@@ -203,9 +203,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 startLocationService();
             }
 
-
-
-
         }
         catch (java.lang.NullPointerException e) {
             Log.e(TAG, "System error");
