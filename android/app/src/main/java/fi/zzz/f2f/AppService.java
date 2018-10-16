@@ -16,6 +16,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.PowerManager;
 import android.os.RemoteException;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
@@ -182,13 +183,31 @@ public class AppService extends Service {
         }
     }
 
+    // Try to keep process alive
+    PowerManager powerManager;
+    PowerManager.WakeLock wakeLock;
+    private final static int INTERVAL = 1000 * 60 * 2; //2 minutes
+    Handler mHandler = new Handler();
+    Runnable mHandlerTask = new Runnable()
+    {
+        @Override
+        public void run() {
+            dummyTask();
+            mHandler.postDelayed(mHandlerTask, 1000*10);
+        }
+    };
+
+
+
 
     public AppService() {
         last = this;
+
+        mHandlerTask.run();
     }
 
-    void dummyMethod() {
-        Log.i(TAG, "Dummy method");
+    void dummyTask() {
+        Log.i(TAG, "Dummy task");
     }
 
     @Override
@@ -222,6 +241,7 @@ public class AppService extends Service {
 
         startServiceWithNotification();
         startLocationService();
+        startWakeLock();
 
         super.onCreate();
     }
@@ -281,6 +301,12 @@ public class AppService extends Service {
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
     }
 
+    void startWakeLock() {
+        powerManager = (PowerManager)getApplicationContext().getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                "F2F::Service");
+        wakeLock.acquire();
+    }
 
     void handleRegister() {
         if (!is_registered) {
