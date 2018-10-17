@@ -79,10 +79,10 @@ public class AppService extends Service {
     public static boolean setup_gender = false;
     public static String setup_name = "Unnamed";
 
-    // Client code
     private int user_id = -1;
     private byte[] pass = new byte[8];
     public boolean is_registered = false;
+    private int login_fails = 0;
 
     public HashMap<String, Channel> channels = new HashMap<>();
     public HashMap<Integer, User> users = new HashMap<>();
@@ -558,12 +558,16 @@ public class AppService extends Service {
             try {
                 login();
                 is_logged_in = true;
+                login_fails = 0;
 
                 refreshChannellist();
                 refreshUserlist();
                 sendPostRefreshGui();
             }
             catch (Exc e) {
+                login_fails++;
+                if (login_fails > 10)
+                    is_registered = false;
                 return false;
             }
             finally {
