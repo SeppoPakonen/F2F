@@ -16,12 +16,14 @@ void ActiveSession::Print(const String& s) {
 }
 
 void ActiveSession::GetUserlist(Index<int>& userlist) {
-	for(int i = 0; i < channels.GetCount(); i++) {
-		int j = server->channels.Find(channels[i]);
-		if (j == -1) continue;
-		const Channel& ch = server->channels[j];
-		for(int j = 0; j < ch.users.GetCount(); j++)
-			userlist.FindAdd(ch.users[j]);
+	UserDatabase& db = GetDatabase(user_id);
+	for(int i = 0; i < db.channels.GetCount(); i++) {
+		int j = db.channels[i];
+		if (j >= 0 && j < server->db.channels.GetCount()) {
+			const Channel& ch = server->db.channels[j];
+			for(int j = 0; j < ch.users.GetCount(); j++)
+				userlist.FindAdd(ch.users[j]);
+		}
 	}
 }
 
@@ -127,6 +129,7 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 	UserDatabase& db = GetDatabase(user_id);
 	
 	server->db.AddUser(user_id, name);
+	server->db.Flush();
 	
 	db.name = name;
 	db.passhash = passhash;
@@ -139,10 +142,11 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 	db.latitude = 0;
 	db.elevation = 0;
 	db.lastupdate = Time(1970,1,1);
-	db.channels.Add("testers");
 	db.Flush();
 	
 	server->lock.LeaveWrite();
+	
+	server->JoinChannel("testers", *this);
 	
 	out.Put(&user_id, sizeof(user_id));
 	out.Put(pass.Begin(), 8);
@@ -153,6 +157,7 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 void ActiveSession::Login(Stream& in, Stream& out) {
 	int r = in.Get(&user_id, sizeof(user_id));
 	if (r != sizeof(user_id)) throw Exc("Invalid login id");
+	
 	if (user_id < 0 || user_id >= server->db.GetUserCount()) throw Exc("Invalid login id");
 	UserDatabase& db = GetDatabase(user_id);
 	
@@ -169,13 +174,6 @@ void ActiveSession::Login(Stream& in, Stream& out) {
 		
 	db.logins++;
 	db.Flush();
-	
-	int ch_count = db.channels.GetCount();
-	for(int i = 0; i < ch_count; i++) {
-		String channel = db.channels[i];
-		if (!channel.IsEmpty())
-			server->JoinChannel(channel, *this);
-	}
 	
 	out.Put32(0);
 	
@@ -194,16 +192,13 @@ void ActiveSession::Logout() {
 	server->user_session_ids.RemoveKey(user_id);
 	server->lock.LeaveWrite();
 	
-	while (!channels.IsEmpty())
-		server->LeaveChannel(server->channels.Get(channels[0]).name, *this);
-	
 	// Dereference messages
-	while (!inbox.IsEmpty()) {
+	while (!db.inbox.IsEmpty()) {
 		try {
-			lock.Enter();
-			if (inbox.IsEmpty()) {lock.Leave(); break;}
-			InboxMessage msg = inbox.Pop();
-			lock.Leave();
+			db.lock.Enter();
+			if (db.inbox.IsEmpty()) {db.lock.Leave(); break;}
+			InboxMessage msg = db.inbox.Pop();
+			db.lock.Leave();
 			
 			MessageRef& ref = server->GetReference(msg.msg);
 			server->DecReference(ref);
@@ -281,22 +276,13 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 }
 
 void ActiveSession::Who(int user_id, Stream& out) {
-	int j = server->user_session_ids.Find(user_id);
-	if (j == -1) {
+	if (user_id < 0 || user_id >= server->db.GetUserCount()) {
 		out.Put32(-1);
 		out.Put32(0);
 		return;
 	}
-	j = server->user_session_ids[j];
-	j = server->sessions.Find(j);
-	if (j == -1) {
-		out.Put32(-1);
-		out.Put32(0);
-		return;
-	}
-	const ActiveSession& as = server->sessions[j];
-	const UserDatabase& db = GetDatabase(as.user_id);
-	out.Put32(as.user_id);
+	const UserDatabase& db = GetDatabase(user_id);
+	out.Put32(user_id);
 	out.Put32(db.name.GetCount());
 	if (!db.name.IsEmpty())
 		out.Put(db.name.Begin(), db.name.GetCount());
@@ -308,11 +294,16 @@ void ActiveSession::Who(int user_id, Stream& out) {
 	out.Put(&db.latitude, sizeof(double));
 	out.Put(&db.elevation, sizeof(double));
 	
-	out.Put32(as.channels.GetCount());
-	for(int j = 0; j < as.channels.GetCount(); j++) {
-		const Channel& ch = server->channels.Get(as.channels[j]);
-		out.Put32(ch.name.GetCount());
-		out.Put(ch.name.Begin(), ch.name.GetCount());
+	out.Put32(db.channels.GetCount());
+	for(int j = 0; j < db.channels.GetCount(); j++) {
+		int k = db.channels[j];
+		if (k < 0 || k >= server->db.channels.GetCount())
+			out.Put32(0);
+		else {
+			const Channel& ch = server->db.channels[k];
+			out.Put32(ch.name.GetCount());
+			out.Put(ch.name.Begin(), ch.name.GetCount());
+		}
 	}
 }
 
@@ -324,6 +315,8 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	if (r != sizeof(key_len) || key_len < 0 || key_len > 200) throw Exc("Invalid key argument");
 	key = in.Get(key_len);
 	if (key.GetCount() != key_len) throw Exc("Invalid key received");
+	
+	const UserDatabase& db = GetDatabase(user_id);
 	
 	int64 size_pos = out.GetPos();
 	out.SeekCur(sizeof(int));
@@ -338,11 +331,16 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	if (key == "channellist") {
 		server->lock.EnterRead();
 		
-		out.Put32(channels.GetCount());
-		for(int i = 0; i < channels.GetCount(); i++) {
-			const Channel& ch = server->channels.Get(channels[i]);
-			out.Put32(ch.name.GetCount());
-			out.Put(ch.name.Begin(), ch.name.GetCount());
+		out.Put32(db.channels.GetCount());
+		for(int i = 0; i < db.channels.GetCount(); i++) {
+			int j = db.channels[i];
+			if (j < 0 || j >= server->db.channels.GetCount())
+				out.Put32(0);
+			else {
+				const Channel& ch = server->db.channels[j];
+				out.Put32(ch.name.GetCount());
+				out.Put(ch.name.Begin(), ch.name.GetCount());
+			}
 		}
 		
 		server->lock.LeaveRead();
@@ -350,8 +348,8 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	else if (key == "allchannellist") {
 		server->lock.EnterRead();
 		VectorMap<String, int> ch_list;
-		for(int i = 0; i < server->channels.GetCount(); i++) {
-			const Channel& ch = server->channels[i];
+		for(int i = 0; i < server->db.channels.GetCount(); i++) {
+			const Channel& ch = server->db.channels[i];
 			if (ch.name.Left(1) == ".") continue; // skip hidden channels
 			int count = ch.users.GetCount();
 			if (!count) continue;
@@ -397,7 +395,9 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 	}
 	else if (key == "who" && args.GetCount() == 1) {
 		int user_id = StrInt(args[0]);
+		server->lock.EnterRead();
 		Who(user_id, out);
+		server->lock.LeaveRead();
 	}
 	
 	out.Seek(size_pos);
@@ -415,11 +415,25 @@ void ActiveSession::Join(Stream& in, Stream& out) {
 	if (ch_name.GetCount() != ch_len) throw Exc("Invalid channel name");
 	
 	// Check if user is already joined at the channel
-	int i = db.channels.Find(ch_name);
-	if (i >= 0) {
+	server->lock.EnterRead();
+	int ch_id = server->db.channels.Find(ch_name);
+	server->lock.LeaveRead();
+	
+	if (ch_id == -1) {
+		server->lock.EnterWrite();
+		ch_id = server->db.channels.Find(ch_name);
+		if (ch_id == -1) {
+			server->db.channels.GetCount();
+			server->db.channels.Add(ch_name).name = ch_name;
+			server->db.Flush();
+		}
+		server->lock.LeaveWrite();
+	}
+	int i = db.channels.Find(ch_id);
+	if (i >= 0 || ch_id < 0) {
 		out.Put32(1);
 	} else {
-		db.channels.Add(ch_name);
+		db.channels.Add(ch_id);
 		db.Flush();
 		
 		server->JoinChannel(ch_name, *this);
@@ -436,7 +450,8 @@ void ActiveSession::Leave(Stream& in, Stream& out) {
 	String ch_name = in.Get(ch_len);
 	if (ch_name.GetCount() != ch_len) throw Exc("Invalid channel name");
 	
-	int i = db.channels.Find(ch_name);
+	int ch_id = server->db.channels.Find(ch_name);
+	int i = db.channels.Find(ch_id);
 	if (i >= 0) {
 		db.channels.Remove(i);
 		db.Flush();
@@ -481,35 +496,33 @@ void ActiveSession::Message(Stream& in, Stream& out) {
 	if (recv_msg.GetCount() != recv_msg_len) throw Exc("Invalid message received");
 	
 	server->lock.EnterRead();
-	i = server->user_session_ids.Find(recv_user_id);
-	if (i < 0)  {server->lock.LeaveRead(); out.Put32(1); return;}
-	int recv_sess_id = server->user_session_ids[i];
-	i = server->sessions.Find(recv_sess_id);
-	if (i < 0)  {server->lock.LeaveRead(); throw Exc("System error");}
-	ActiveSession& recv_as = server->sessions[i];
+	if (recv_user_id < 0 || recv_user_id >= server->db.GetUserCount())  {server->lock.LeaveRead(); out.Put32(1); return;}
 	server->lock.LeaveRead();
 	
 	const MessageRef& ref = server->IncReference("msg " + recv_msg, 1);
+	UserDatabase& db = GetDatabase(recv_user_id);
 	
-	recv_as.lock.Enter();
-	InboxMessage& msg = recv_as.inbox.Add();
+	db.lock.Enter();
+	InboxMessage& msg = db.inbox.Add();
 	msg.msg = ref.hash;
 	msg.sender_id = user_id;
-	recv_as.lock.Leave();
+	db.lock.Leave();
 	
 	out.Put32(0);
 }
 
 void ActiveSession::Poll(Stream& in, Stream& out) {
+	UserDatabase& db = GetDatabase(user_id);
+	
 	Vector<InboxMessage> tmp;
-	lock.Enter();
-	Swap(inbox, tmp);
-	lock.Leave();
+	db.lock.Enter();
+	Swap(db.inbox, tmp);
+	db.lock.Leave();
 	
 	// double check that sender_id != user_id
-	for(int i = 0; i < inbox.GetCount(); i++) {
-		if (inbox[i].sender_id == user_id) {
-			inbox.Remove(i);
+	for(int i = 0; i < db.inbox.GetCount(); i++) {
+		if (db.inbox[i].sender_id == user_id) {
+			db.inbox.Remove(i);
 			i--;
 		}
 	}
@@ -544,29 +557,21 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 	if (recv_msg.GetCount() != recv_msg_len) throw Exc("Invalid message received");
 	
 	server->lock.EnterRead();
-	i = server->channel_ids.Find(recv_ch);
+	i = server->db.channels.Find(recv_ch);
 	if (i < 0)  {server->lock.LeaveRead(); out.Put32(1); return;}
-	int recv_sess_id = server->channel_ids[i];
-	i = server->channels.Find(recv_sess_id);
-	if (i < 0)  {server->lock.LeaveRead(); throw Exc("System error");}
-	Channel& ch = server->channels[i];
+	Channel& ch = server->db.channels[i];
 	
 	const MessageRef& ref = server->IncReference("chmsg " + recv_ch + " " + recv_msg, ch.users.GetCount() - 1);
 	
 	for(int i = 0; i < ch.users.GetCount(); i++) {
 		int id = ch.users[i];
 		if (id == user_id) continue;
-		int j = server->user_session_ids.Find(id);
-		if (j == -1) continue;
-		id = server->user_session_ids[j];
-		j = server->sessions.Find(id);
-		if (j == -1) continue;
-		ActiveSession& recv_as = server->sessions[j];
-		recv_as.lock.Enter();
-		InboxMessage& msg = recv_as.inbox.Add();
+		UserDatabase& db = GetDatabase(id);
+		db.lock.Enter();
+		InboxMessage& msg = db.inbox.Add();
 		msg.msg = ref.hash;
 		msg.sender_id = user_id;
-		recv_as.lock.Leave();
+		db.lock.Leave();
 	}
 	server->lock.LeaveRead();
 	

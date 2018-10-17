@@ -87,6 +87,7 @@ Server::~Server() {
 	RemoveBots();
 	running = false; listener.Close(); while (!stopped) Sleep(100);
 	StoreThis();
+	db.Flush();
 }
 
 void Server::TimedRefresh() {
@@ -258,8 +259,8 @@ void Server::Data() {
 		serverlog.ScrollEnd();
 	}
 	else if (tab == ANAL_TAB) {
-		for(int i = 0; i < channels.GetCount(); i++) {
-			analyze_chlist.Set(i, 0, channels[i].name);
+		for(int i = 0; i < db.channels.GetCount(); i++) {
+			analyze_chlist.Set(i, 0, db.channels[i].name);
 		}
 		
 	}
@@ -395,33 +396,32 @@ void Server::SendToAll(ActiveSession& user, String msg) {
 void Server::JoinChannel(const String& channel, ActiveSession& user) {
 	if (channel.IsEmpty()) return;
 	lock.EnterWrite();
-	int i = channel_ids.Find(channel);
-	int id;
-	if (i == -1) {
-		id = channel_counter++;
-		channel_ids.Add(channel, id);
-		Channel& ch = channels.Add(id);
+	int id = db.channels.Find(channel);
+	if (id == -1) {
+		id = db.channels.GetCount();
+		Channel& ch = db.channels.Add(channel);
 		ch.name = channel;
-	} else {
-		id = channel_ids[i];
 	}
-	Channel& ch = channels.Get(id);
+	Channel& ch = db.channels.Get(channel);
 	SendMessage(user.user_id, "join " + IntStr(user.user_id) + " " + channel, ch.users);
 	ch.users.FindAdd(user.user_id);
-	user.channels.Add(id);
+	UserDatabase& user_db = GetDatabase(user.user_id);
+	user_db.channels.Add(id);
+	user_db.Flush();
+	db.Flush();
 	lock.LeaveWrite();
 }
 
 void Server::LeaveChannel(const String& channel, ActiveSession& user) {
 	lock.EnterWrite();
-	int id = channel_ids.GetAdd(channel);
-	int i = channels.Find(id);
-	if (i != -1) {
-		Channel& ch = channels[i];
+	int id = db.channels.Find(channel);
+	if (id != -1) {
+		UserDatabase& user_db = GetDatabase(user.user_id);
+		Channel& ch = db.channels[id];
 		ch.users.RemoveKey(user.user_id);
-		user.channels.RemoveKey(id);
+		user_db.channels.RemoveKey(id);
 		SendMessage(user.user_id, "leave " + IntStr(user.user_id) + " " + channel, ch.users);
-		UserDatabase& db = GetDatabase(user.user_id);
+		db.Flush();
 	}
 	lock.LeaveWrite();
 }
@@ -438,11 +438,12 @@ void Server::SendMessage(int sender_id, const String& msg, const Index<int>& use
 		j = sessions.Find(user_session_ids[j]);
 		if (j == -1) continue;
 		ActiveSession& as = sessions[j];
-		as.lock.Enter();
-		InboxMessage& m = as.inbox.Add();
+		UserDatabase& user_db = GetDatabase(as.user_id);
+		user_db.lock.Enter();
+		InboxMessage& m = user_db.inbox.Add();
 		m.sender_id = sender_id;
 		m.msg = ref.hash;
-		as.lock.Leave();
+		user_db.lock.Leave();
 	}
 }
 
@@ -549,6 +550,7 @@ void Server::ChangeLocation() {
 }
 
 void Server::Analyze(String ch) {
+	int ch_id = db.channels.Find(ch);
 	
 	Vector<Vector<Line> > routes;
 	
@@ -557,7 +559,7 @@ void Server::Analyze(String ch) {
 		Vector<Line>& user_routes = routes.Add();
 		
 		UserDatabase& db0 = GetDatabase(i);
-		if (db0.channels.Find(ch) == -1) continue;
+		if (db0.channels.Find(ch_id) == -1) continue;
 		
 		db0.lock.Enter();
 		

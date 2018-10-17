@@ -56,6 +56,13 @@ struct UserSessionLog : Moveable<LogItem> {
 	void Serialize(Stream& s) {s % log % begin % end % peer_addr;}
 };
 
+struct InboxMessage : Moveable<InboxMessage> {
+	int sender_id;
+	unsigned msg;
+	
+	void Serialize(Stream& s) {s % sender_id % msg;}
+};
+
 class UserDatabase {
 	
 protected:
@@ -78,8 +85,9 @@ public:
 	
 	
 	// Persistent
+	Vector<InboxMessage> inbox;
 	ArrayMap<int, UserSessionLog> sessions;
-	Index<String> channels;
+	Index<int> channels;
 	String name, profile_img;
 	unsigned profile_img_hash = 0;
 	unsigned passhash = 0;
@@ -90,7 +98,7 @@ public:
 	Time lastupdate;
 	bool gender = 1;
 	
-	void Serialize(Stream& s) {s % sessions % name % profile_img % profile_img_hash % channels % passhash % age % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate % gender;}
+	void Serialize(Stream& s) {s % inbox % sessions % channels % name % profile_img % profile_img_hash % channels % passhash % age % joined % lastlogin % logins % onlinetotal % visibletotal % longitude % latitude % elevation % lastupdate % gender;}
 	void Flush();
 	void SetLocation(double longitude, double latitude, double elevation);
 };
@@ -99,14 +107,23 @@ struct Line : Moveable<Line> {
 	Pointf a, b;
 };
 
-enum {
-	SERVER_NICK
+struct Channel : Moveable<Channel> {
+	Index<int> users;
+	String name;
+	int id;
+	
+	void Serialize(Stream& s) {s % users % name % id;}
 };
 
 class ServerDatabase {
 	
+protected:
+	friend class Server;
+	friend class ActiveSession;
+	
 	// Persistent
 	VectorMap<int, String> users;
+	VectorMap<String, Channel> channels;
 	
 	// Temporary
 	String srv_file;
@@ -120,20 +137,9 @@ public:
 	void SetUser(int user_id, String name) {users.GetAdd(user_id) = name;}
 	String GetUser(int i) {return users[i];}
 	
-	void Serialize(Stream& s) {s % users;}
+	void Serialize(Stream& s) {s % users % channels;}
 	void Flush();
 	
-};
-
-struct InboxMessage : Moveable<InboxMessage> {
-	int sender_id;
-	unsigned msg;
-};
-
-struct Channel {
-	Index<int> users;
-	String name;
-	int id;
 };
 
 UserDatabase& GetDatabase(int user_id);
@@ -144,15 +150,12 @@ protected:
 	friend class Server;
 	
 	Server* server = NULL;
-	Mutex lock;
 	TcpSocket s;
 	bool stopped = false;
 	
 	int sess_id = -1;
 	int user_id = -1;
 	
-	Vector<InboxMessage> inbox;
-	Index<int> channels;
 	
 	Vector<LogItem> log;
 	
@@ -203,15 +206,12 @@ protected:
 	
 	// Temporary
 	ArrayMap<int, ActiveSession> sessions;
-	ArrayMap<int, Channel> channels;
 	VectorMap<int, int> user_session_ids;
-	VectorMap<String, int> channel_ids;
 	VectorMap<unsigned, MessageRef> messages;
 	TcpSocket listener;
 	Index<String> blacklist;
 	ServerDatabase db;
 	RWMutex lock, msglock;
-	int channel_counter = 0;
 	bool running = false, stopped = true;
 	
 	

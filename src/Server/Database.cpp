@@ -91,7 +91,7 @@ ServerDatabase::ServerDatabase() {
 }
 
 void ServerDatabase::Init() {
-	srv_file = ConfigFile("server.bin");
+	srv_file = ConfigFile("server_db.bin");
 	
 	LoadFromFile(*this, srv_file);
 }
