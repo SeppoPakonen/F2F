@@ -1,6 +1,7 @@
 package fi.zzz.f2f;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -11,6 +12,8 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -93,14 +96,16 @@ public class AppService extends Service {
     public String active_channel = "";
     public Socket sock;
     public double prev_lon = 0, prev_lat = 0, prev_alt = 0;
+    public long login_id = 0;
     public int port = 17000;
     public int age = 0;
     public boolean gender = true;
     public boolean is_logged_in = false;
+    public boolean is_viewing_messages = false;
     public DataInputStream input;
     public DataOutputStream output;
-    public Lock call_lock = new ReentrantLock();;
-    public Lock lock = new ReentrantLock();;
+    public Lock call_lock = new ReentrantLock();
+    public Lock lock = new ReentrantLock();
 
     // Messenger object used by clients to send messages to IncomingHandler
     Messenger mMessenger = new Messenger(new IncomingHandler());
@@ -317,6 +322,44 @@ public class AppService extends Service {
         }
     }
 
+    void isViewingMessages(boolean b) {
+        is_viewing_messages = b;
+    }
+
+    void NotifyNewChannelMessage(String channel, String user, String message) {
+
+        if (is_viewing_messages && channel.equals(active_channel))
+            return;
+
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(this)
+                        .setSmallIcon(R.drawable.ic_forum_black_24dp)
+                        .setContentTitle(user + ": " + message)
+                        .setContentInfo(message)
+                        .setContentText(message);
+
+
+        Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        builder.setSound(alarmSound);
+
+        Intent notificationIntent = new Intent(this, MapsActivity.class);
+        notificationIntent.setAction(channel);
+
+        PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT);
+
+        builder.setContentIntent(contentIntent);
+        builder.setAutoCancel(true);
+        builder.setLights(Color.BLUE, 500, 500);
+        long[] pattern = {500,500,500,500,500,500,500,500,500};
+        builder.setVibrate(pattern);
+        builder.setStyle(new NotificationCompat.InboxStyle());
+// Add as notification
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        builder.setStyle(new NotificationCompat.InboxStyle());
+        manager.notify(1, builder.build());
+    }
 
 
 
@@ -329,11 +372,11 @@ public class AppService extends Service {
             @Override
             public void run() {
                 addr = "f2f.zzz.fi";
+                //addr = "192.168.1.106";
                 port = 17000;
                 connect();
                 registerScript();
                 loginScript();
-                setup();
                 handleConnection();
             }
         };
@@ -499,25 +542,32 @@ public class AppService extends Service {
         }
     }
 
+    void disconnect() {
+        if (sock != null) {
+            try {
+                sock.close();
+            } catch (IOException e) {
+
+            }
+        }
+        sock = null;
+    }
+
     boolean connect() {
         if (sock == null || sock.isClosed()) {
-            sendPostSetTitle(getApplicationContext().getResources().getString(R.string.connecting));
+            //sendPostSetTitle(getApplicationContext().getResources().getString(R.string.connecting));
 
             Log.i(TAG, "Connecting");
-            is_logged_in = false;
 
             try {
                 Log.i(TAG, "Connecting " + addr + ":" + Integer.toString(port));
                 sock = new Socket(addr, port);
 
-                input = new DataInputStream(this.sock.getInputStream());
-                output = new DataOutputStream(this.sock.getOutputStream());
+                if (sock != null) {
+                    input = new DataInputStream(this.sock.getInputStream());
+                    output = new DataOutputStream(this.sock.getOutputStream());
+                }
 
-                ByteBuffer bb = ByteBuffer.allocate(4);
-                bb.putInt(swap(-1));
-                bb.position(0);
-                while (bb.hasRemaining())
-                    output.write(bb.get());
             }
             catch (UnknownHostException e1) {
                 Log.w(TAG, "Couldn't resolve host");
@@ -527,6 +577,8 @@ public class AppService extends Service {
                 Log.w(TAG, "Socket IO error");
                 return false;
             }
+
+            //sendPostSetTitle(getApplicationContext().getResources().getString(R.string.activity_maps));
         }
         return true;
     }
@@ -537,6 +589,7 @@ public class AppService extends Service {
             try {
                 register();
                 is_registered = true;
+                is_logged_in = false;
                 storeThis();
             }
             catch (Exc e) {
@@ -550,29 +603,31 @@ public class AppService extends Service {
     boolean loginScript() {
         if (!is_logged_in) {
             sendPostSetTitle(getApplicationContext().getResources().getString(R.string.logging_in));
-            lock.lock();
-            users.clear();
-            channels.clear();
-            lock.unlock();
 
             try {
-                login();
-                is_logged_in = true;
-                login_fails = 0;
+                if (login()) {
+                    login_fails = 0;
+                }
+                else {
+                    login_fails++;
+                    if (login_fails > 10)
+                        is_registered = false;
+                    throw new Exc("Login failed");
+                }
 
                 refreshChannellist();
                 refreshUserlist();
+                is_logged_in = true;
                 sendPostRefreshGui();
             }
             catch (Exc e) {
-                login_fails++;
-                if (login_fails > 10)
-                    is_registered = false;
                 return false;
             }
             finally {
                 sendPostSetTitle(getApplicationContext().getResources().getString(R.string.activity_maps));
             }
+
+            setup();
         }
         return true;
     }
@@ -701,22 +756,21 @@ public class AppService extends Service {
         int count = 0;
 
         while (!Thread.interrupted()) {
-            connect();
 
             try {
-                while (!Thread.interrupted() && sock.isConnected()) {
+                while (!Thread.interrupted()) {
                     registerScript();
                     loginScript();
 
                     poll();
-                    sleep(1000);
+                    sleep(5000);
                     count++;
                 }
 
                 sock.close();
             }
             catch (Exc e) {
-                Log.e(TAG, "Error: " + e);
+                Log.e(TAG, "Error: " + e.msg);
             }
             catch (IOException e) {
                 Log.e(TAG, "Error: IOException");
@@ -726,6 +780,7 @@ public class AppService extends Service {
             }
 
             is_logged_in = false;
+
             try {sock.close();} catch (IOException e) {} catch (NullPointerException e) {}
             sock = null;
         }
@@ -745,6 +800,12 @@ public class AppService extends Service {
                 .order(ByteOrder.LITTLE_ENDIAN).getDouble(0);
     }
 
+    public static long swapLong(long x) {
+        return ByteBuffer.allocate(8)
+                .order(ByteOrder.BIG_ENDIAN).putLong(x)
+                .order(ByteOrder.LITTLE_ENDIAN).getLong(0);
+    }
+
     private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -760,10 +821,17 @@ public class AppService extends Service {
         byte[] in_data;
         int r;
 
-        if (sock == null)
-            return new DataInputStream(new ByteArrayInputStream(new byte[0]));
-
         call_lock.lock();
+
+        disconnect();
+        connect();
+
+        if (sock == null) {
+            call_lock.unlock();
+            return new DataInputStream(new ByteArrayInputStream(new byte[0]));
+        }
+
+
         try {
             sock.setSoTimeout(30000);
 
@@ -791,6 +859,7 @@ public class AppService extends Service {
             throw new Exc("Call: IOException");
         }
         finally {
+            disconnect();
             call_lock.unlock();
         }
         return new DataInputStream(new ByteArrayInputStream(in_data));
@@ -842,7 +911,7 @@ public class AppService extends Service {
         }
     }
 
-    void login() throws Exc {
+    boolean login() throws Exc {
         try {
             ByteArrayOutputStream dout = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(dout);
@@ -854,6 +923,10 @@ public class AppService extends Service {
             DataInputStream in = call(dout.toByteArray());
 
             int ret = swap(in.readInt());
+            if (ret == 1)
+                return false;
+
+            login_id = swapLong(in.readLong());
 
             int name_len = swap(in.readInt());
             byte[] name_bytes = new byte[name_len];
@@ -862,6 +935,7 @@ public class AppService extends Service {
             age = swap(in.readInt());
             gender = swap(in.readInt()) != 0;
             Log.i(TAG, "Client " + Integer.toString(user_id) + " logged in (" + Integer.toString(user_id) + "," + new String(pass) + ") name: " + user_name);
+            return true;
         }
         catch (IOException e) {
             throw new Exc("Register: IOException");
@@ -873,6 +947,9 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(30));
+
+            out.writeLong(swapLong(login_id));
+
             out.writeInt(swap(key.length()));
             out.write(key.getBytes());
             out.writeInt(swap(value.length));
@@ -899,6 +976,9 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(40));
+
+            out.writeLong(swapLong(login_id));
+
             out.writeInt(swap(key.length()));
             out.write(key.getBytes());
 
@@ -926,6 +1006,9 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(50));
+
+            out.writeLong(swapLong(login_id));
+
             out.writeInt(swap(channel.length()));
             out.writeBytes(channel);
 
@@ -955,6 +1038,9 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(60));
+
+            out.writeLong(swapLong(login_id));
+
             out.writeInt(swap(channel.length()));
             out.writeBytes(channel);
 
@@ -980,6 +1066,9 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(70));
+
+            out.writeLong(swapLong(login_id));
+
             out.writeInt(swap(msg.length()));
             out.writeBytes(msg);
 
@@ -1024,6 +1113,8 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(80));
+
+            out.writeLong(swapLong(login_id));
 
             DataInputStream in = call(dout.toByteArray());
 
@@ -1070,6 +1161,8 @@ public class AppService extends Service {
                     Channel ch = channels.get(ch_name);
                     ch.post(ch_name, sender_id, u.name, message, false, u.profile_image);
                     sendPostRefreshGui();
+
+                    NotifyNewChannelMessage(ch_name, u.name, message);
                 }
                 else if (key.equals("join")) {
                     String message = new String(message_bytes);
@@ -1114,12 +1207,13 @@ public class AppService extends Service {
                     String user_name = args[1];
                     if (!users.containsKey(user_id)) continue;
                     User u = users.get(user_id);
+                    String old_name = u.name;
                     u.name = user_name;
                     for (String ch_name : u.channels) {
                         if (!my_channels.contains(ch_name)) continue;
                         if (!channels.containsKey(ch_name)) channels.put(ch_name, new Channel());
                         Channel ch = channels.get(ch_name);
-                        ch.post(ch_name, -1, "Server", "User " + u.name + " changed name to " + user_name, false, u.profile_image);
+                        ch.post(ch_name, -1, "Server", "User " + old_name + " changed name to " + user_name, false, u.profile_image);
                     }
                     sendPostRefreshGui();
                 }
@@ -1220,6 +1314,8 @@ public class AppService extends Service {
 
             out.writeInt(swap(90));
 
+            out.writeLong(swapLong(login_id));
+
             double lat = l.getLatitude();
             double lon = l.getLongitude();
             double alt = l.getAltitude();
@@ -1253,6 +1349,8 @@ public class AppService extends Service {
             DataOutputStream out = new DataOutputStream(dout);
 
             out.writeInt(swap(100));
+
+            out.writeLong(swapLong(login_id));
 
             out.writeInt(swap(channel.length()));
             out.writeBytes(channel);
@@ -1573,6 +1671,8 @@ class ChannelMessage implements Serializable {
 class Channel implements Serializable {
     List<ChannelMessage> messages;
     HashSet<Integer> userlist;
+    Lock call_lock = new ReentrantLock();
+
     int unread = 0;
 
     Channel() {
@@ -1580,6 +1680,8 @@ class Channel implements Serializable {
         userlist = new HashSet<>();
     }
     void post(String ch_name, int user_id, String user_name, String msg, boolean belongs_to_user, Bitmap icon) {
+        call_lock.lock();
+
         ChannelMessage m = new ChannelMessage();
         m.received = Calendar.getInstance().getTime();
         m.message = msg;
@@ -1588,6 +1690,9 @@ class Channel implements Serializable {
         m.belongs_to_user = belongs_to_user;
         m.icon = icon;
         messages.add(m);
+
+        call_lock.unlock();
+
         Log.i("Channel", Integer.toString(user_id) + ", " + user_name + " sent to channel " + ch_name + " message " + msg);
 
         if (AppService.last.isActiveChannel(ch_name) && belongs_to_user == false) {

@@ -64,6 +64,12 @@
             android:exported="true">
         </activity>
 
+        <activity
+            android:name=".UsersActivity"
+            android:enabled="true"
+            android:exported="true">
+        </activity>
+
         <service android:name=".AppService"
             android:enabled="true"
             android:exported="true"

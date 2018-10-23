@@ -35,7 +35,18 @@ public class MessagesActivity extends Activity {
         messagesView = (ListView) findViewById(R.id.messages_view);
         messagesView.setAdapter(messageAdapter);
 
-        postAddMessages();
+        Channel ch = AppService.last.getActiveChannel();
+        if (ch != null)
+            MessagesActivity.last.addMessages(ch);
+
+        AppService.last.isViewingMessages(true);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        AppService.last.isViewingMessages(false);
     }
 
     void postAddMessages() {
@@ -48,7 +59,8 @@ public class MessagesActivity extends Activity {
     }
 
     void addMessages(Channel ch) {
-        if (messagesView.getCount() != 0)
+
+        if (messagesView.getCount() != 0 || ch == null)
             return;
         //Channel ch = AppService.last.getActiveChannel();
         for (ChannelMessage msg : ch.messages) {

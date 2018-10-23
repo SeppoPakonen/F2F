@@ -49,6 +49,8 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -59,6 +61,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private HashMap<Integer, Marker> markers;
     private Marker my_marker;
 
+    public Lock lock = new ReentrantLock();
+
     private static final String TAG = "F2F";
     private static final int REQUEST_PERMISSION_LOCATION = 255; // int should be between 0 and 255
 
@@ -66,6 +70,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     class IncomingHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
+            AppService.last.lock.lock();
             Bundle bundle = msg.getData();
             switch (msg.what) {
                 case AppService.STARTONBOARDING:
@@ -111,6 +116,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 default:
                     super.handleMessage(msg);
             }
+            AppService.last.lock.unlock();
         }
     }
 
@@ -146,6 +152,20 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             setContentView(R.layout.activity_maps);
 
 
+            Intent intent = getIntent();
+            String action = intent.getAction();
+
+            if (!action.isEmpty()) {
+                if (action == Intent.ACTION_MAIN) {
+
+                }
+                else {
+                    AppService.last.setActiveChannel(action);
+                    startMessages();
+                }
+            }
+
+
             // Start background service
             Intent i = new Intent(this, AppService.class);
             i.putExtra("name", "F2F service");
@@ -178,6 +198,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             }
                             else if (id == R.id.nav_messages) {
                                 startMessages();
+                            }
+                            else if (id == R.id.channel_users) {
+                                startUsers();
                             }
                             // Add code here to update the UI based on the item selected
                             // For example, swap UI fragments here
@@ -264,8 +287,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     void startMessages() {
         startActivity(new Intent(this, MessagesActivity.class));
-        if (MessagesActivity.last != null)
-            MessagesActivity.last.postAddMessages();
+    }
+
+    void startUsers() {
+        startActivity(new Intent(this, UsersActivity.class));
+        if (UsersActivity.last != null)
+            UsersActivity.last.refresh();
     }
 
 
@@ -366,6 +393,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     void refreshGui(HashMap<String, Channel> channels, HashSet<String> my_channels, final String active_channel, HashMap<Integer, User> users) {
+
         final RadioGroup channel_list = findViewById(R.id.channel_list);
         channel_list.removeAllViews();
         int i = 0;
@@ -421,8 +449,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         HashSet<Integer> rem_list = new HashSet<>();
         rem_list.addAll(markers.keySet());
 
+
+
         for (Integer user_id : ch.userlist) {
-            rem_list.remove(user_id);
+            rem_list.remove((int)user_id);
 
             User u = users.get(user_id);
             if (u.profile_image == null)
@@ -450,6 +480,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             catch (NullPointerException e) {}
             markers.remove(user_id);
         }
+
 
     }
 
