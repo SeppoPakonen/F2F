@@ -6,25 +6,13 @@ ActiveSession::ActiveSession() {
 }
 
 void ActiveSession::Print(const String& s) {
-	if (user_id < 0) return;
-	UserDatabase& db = GetDatabase(user_id);
+	if (last_user_id < 0) return;
+	UserDatabase& db = GetDatabase(last_user_id);
 	db.lock.Enter();
 	UserSessionLog& ses = db.sessions.GetAdd(sess_id);
 	db.lock.Leave();
 	if (ses.begin == Time(1970,1,1)) ses.begin = GetSysTime();
 	ses.log.Add().Set(s);
-}
-
-void ActiveSession::GetUserlist(Index<int>& userlist) {
-	UserDatabase& db = GetDatabase(user_id);
-	for(int i = 0; i < db.channels.GetCount(); i++) {
-		int j = db.channels[i];
-		if (j >= 0 && j < server->db.channels.GetCount()) {
-			const Channel& ch = server->db.channels[j];
-			for(int j = 0; j < ch.users.GetCount(); j++)
-				userlist.FindAdd(ch.users[j]);
-		}
-	}
 }
 
 void ActiveSession::Run() {
@@ -59,9 +47,9 @@ void ActiveSession::Run() {
 			r = in.Get(&code, sizeof(code));
 			if (r != sizeof(code)) throw Exc("Received invalid code");
 			
-			if (code > 20 && user_id == -1) throw Exc("Not logged in");
 			
 			switch (code) {
+				case 0:			Greeting(in, out); break;
 				case 10:		Register(in, out); break;
 				case 20:		Login(in, out); break;
 				case 30:		Set(in, out); break;
@@ -115,11 +103,22 @@ void ActiveSession::Run() {
 	stopped = true;
 }
 
+void ActiveSession::Greeting(Stream& in, Stream& out) {
+	String title = Config::server_title;
+	int i = title.GetCount();
+	out.Put(&i, sizeof(int));
+	out.Put(title.Begin(), title.GetCount());
+	i = server->sessions.GetCount();
+	out.Put(&i, sizeof(int));
+	i = Config::max_sessions;
+	out.Put(&i, sizeof(int));
+}
+
 void ActiveSession::Register(Stream& in, Stream& out) {
 	
 	server->lock.EnterWrite();
 	
-	user_id = server->db.GetUserCount();
+	int user_id = server->db.GetUserCount();
 	String name = "User" + IntStr(user_id);
 	
 	String pass = RandomPassword(8);
@@ -144,9 +143,11 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 	db.lastupdate = Time(1970,1,1);
 	db.Flush();
 	
+	last_user_id = user_id;
+	
 	server->lock.LeaveWrite();
 	
-	server->JoinChannel("testers", *this);
+	server->JoinChannel("testers", user_id);
 	
 	out.Put(&user_id, sizeof(user_id));
 	out.Put(pass.Begin(), 8);
@@ -155,44 +156,68 @@ void ActiveSession::Register(Stream& in, Stream& out) {
 }
 
 void ActiveSession::Login(Stream& in, Stream& out) {
-	int r = in.Get(&user_id, sizeof(user_id));
-	if (r != sizeof(user_id)) throw Exc("Invalid login id");
-	
-	if (user_id < 0 || user_id >= server->db.GetUserCount()) throw Exc("Invalid login id");
-	UserDatabase& db = GetDatabase(user_id);
-	
-	String pass = in.Get(8);
-	if (pass.GetCount() != 8) throw Exc("Invalid login password");
-	int64 passhash = pass.GetHashValue();
-	
-	int64 correct_passhash = db.passhash;
-	if (passhash != correct_passhash || !correct_passhash) throw Exc("Invalid login password");
-	
-	server->lock.EnterWrite();
-	server->user_session_ids.GetAdd(user_id, sess_id) = sess_id;
-	server->lock.LeaveWrite();
+	try {
+		int user_id;
+		int r = in.Get(&user_id, sizeof(user_id));
+		if (r != sizeof(user_id)) throw Exc("Invalid login id");
 		
-	db.logins++;
-	db.Flush();
-	
-	out.Put32(0);
-	
-	out.Put32(db.name.GetCount());
-	out.Put(db.name.Begin(), db.name.GetCount());
-	out.Put32(db.age);
-	out.Put32(db.gender);
-	
-	Print("Logged in");
+		if (user_id < 0 || user_id >= server->db.GetUserCount()) throw Exc("Invalid login id");
+		UserDatabase& db = GetDatabase(user_id);
+		last_user_id = user_id;
+		
+		String pass = in.Get(8);
+		if (pass.GetCount() != 8) throw Exc("Invalid login password");
+		int64 passhash = pass.GetHashValue();
+		
+		int64 correct_passhash = db.passhash;
+		if (passhash != correct_passhash || !correct_passhash) throw Exc("Invalid login password");
+		
+		server->lock.EnterWrite();
+		server->user_session_ids.GetAdd(user_id, sess_id) = sess_id;
+		int64 login_id = server->GetNewLoginId();
+		server->login_session_ids.GetAdd(login_id, user_id);
+		server->lock.LeaveWrite();
+			
+		db.logins++;
+		db.Flush();
+		
+		out.Put32(0);
+		
+		out.Put64(login_id);
+		
+		out.Put32(db.name.GetCount());
+		out.Put(db.name.Begin(), db.name.GetCount());
+		out.Put32(db.age);
+		out.Put32(db.gender);
+		
+		Print("Logged in");
+	}
+	 catch (Exc e) {
+	    out.Put32(1);
+	    Print("Login failed");
+	 }
 }
 
 void ActiveSession::Logout() {
-	UserDatabase& db = GetDatabase(user_id);
+	if (last_user_id < 0)
+		return;
 	
 	server->lock.EnterWrite();
-	server->user_session_ids.RemoveKey(user_id);
+	server->user_session_ids.RemoveKey(last_user_id);
 	server->lock.LeaveWrite();
 	
-	// Dereference messages
+	Print("Logged out");
+	
+	UserDatabase& db = GetDatabase(last_user_id);
+	UserSessionLog& ses = db.sessions.GetAdd(sess_id);
+	ses.end = GetSysTime();
+	
+	db.Deinit();
+}
+
+void ActiveSession::DereferenceMessages() {
+	UserDatabase& db = GetDatabase(last_user_id);
+	
 	while (!db.inbox.IsEmpty()) {
 		try {
 			db.lock.Enter();
@@ -207,16 +232,29 @@ void ActiveSession::Logout() {
 			Print("Messages deleted");
 		}
 	}
+}
+
+int ActiveSession::LoginId(Stream& in) {
+	int64 login_id;
+	int r = in.Get(&login_id, sizeof(login_id));
+	if (r != sizeof(login_id)) throw Exc("Invalid login id");
 	
-	Print("Logged out");
+	server->lock.EnterRead();
+	int i = server->login_session_ids.Find(login_id);
+	int user_id = -1;
+	if (i >= 0) user_id = server->login_session_ids[i];
+	server->lock.LeaveRead();
+	if (user_id < 0)
+		throw Exc("Invalid login id");
 	
-	UserSessionLog& ses = db.sessions.GetAdd(sess_id);
-	ses.end = GetSysTime();
+	last_user_id = user_id;
 	
-	db.Deinit();
+	return user_id;
 }
 
 void ActiveSession::Set(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	UserDatabase& db = GetDatabase(user_id);
 	int r;
 	int key_len;
@@ -245,7 +283,7 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		
 		server->lock.EnterRead();
 		Index<int> userlist;
-		GetUserlist(userlist);
+		server->GetUserlist(userlist, user_id);
 		userlist.RemoveKey(user_id);
 		server->SendMessage(user_id, "name " + IntStr(user_id) + " " + value, userlist);
 		server->lock.LeaveRead();
@@ -270,7 +308,7 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		
 		StoreImageCache(db.profile_img_hash, db.profile_img);
 		
-		server->SendToAll(*this, "profile " + IntStr(user_id) + " " + value);
+		server->SendToAll(user_id, "profile " + IntStr(user_id) + " " + value);
 	}
 	out.Put32(ret);
 }
@@ -308,6 +346,8 @@ void ActiveSession::Who(int user_id, Stream& out) {
 }
 
 void ActiveSession::Get(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	int r;
 	int key_len;
 	String key;
@@ -369,7 +409,7 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 		server->lock.EnterRead();
 		
 		Index<int> userlist;
-		GetUserlist(userlist);
+		server->GetUserlist(userlist, user_id);
 		userlist.RemoveKey(user_id);
 		out.Put32(userlist.GetCount());
 		for(int i = 0; i < userlist.GetCount(); i++)
@@ -407,6 +447,8 @@ void ActiveSession::Get(Stream& in, Stream& out) {
 }
 
 void ActiveSession::Join(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	UserDatabase& db = GetDatabase(user_id);
 	int ch_len;
 	in.Get(&ch_len, sizeof(ch_len));
@@ -436,13 +478,15 @@ void ActiveSession::Join(Stream& in, Stream& out) {
 		db.channels.Add(ch_id);
 		db.Flush();
 		
-		server->JoinChannel(ch_name, *this);
+		server->JoinChannel(ch_name, user_id);
 		
 		out.Put32(0);
 	}
 }
 
 void ActiveSession::Leave(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	UserDatabase& db = GetDatabase(user_id);
 	int ch_len;
 	in.Get(&ch_len, sizeof(ch_len));
@@ -456,12 +500,14 @@ void ActiveSession::Leave(Stream& in, Stream& out) {
 		db.channels.Remove(i);
 		db.Flush();
 	}
-	server->LeaveChannel(ch_name, *this);
+	server->LeaveChannel(ch_name, user_id);
 	
 	out.Put32(0);
 }
 
 void ActiveSession::Location(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	UserDatabase& db = GetDatabase(user_id);
 	int r;
 	double lat = 0, lon = 0, elev = 0;
@@ -476,7 +522,7 @@ void ActiveSession::Location(Stream& in, Stream& out) {
 	
 	server->lock.EnterRead();
 	Index<int> userlist;
-	GetUserlist(userlist);
+	server->GetUserlist(userlist, user_id);
 	userlist.RemoveKey(user_id);
 	server->SendMessage(user_id, "loc " + IntStr(user_id) + " " + DblStr(lon) + " " + DblStr(lat) + " " + DblStr(elev), userlist);
 	server->lock.LeaveRead();
@@ -485,6 +531,8 @@ void ActiveSession::Location(Stream& in, Stream& out) {
 }
 
 void ActiveSession::Message(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	int r, i;
 	int recv_user_id, recv_msg_len;
 	String recv_msg;
@@ -512,6 +560,8 @@ void ActiveSession::Message(Stream& in, Stream& out) {
 }
 
 void ActiveSession::Poll(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	UserDatabase& db = GetDatabase(user_id);
 	
 	Vector<InboxMessage> tmp;
@@ -544,6 +594,8 @@ void ActiveSession::Poll(Stream& in, Stream& out) {
 }
 
 void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
+	int user_id = LoginId(in);
+	
 	int r, i;
 	int recv_ch_len, recv_msg_len;
 	String recv_ch, recv_msg;

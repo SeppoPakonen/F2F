@@ -154,8 +154,7 @@ protected:
 	bool stopped = false;
 	
 	int sess_id = -1;
-	int user_id = -1;
-	
+	int last_user_id = -1;
 	
 	Vector<LogItem> log;
 	
@@ -167,12 +166,14 @@ public:
 	void Start() {Thread::Start(THISBACK(Run));}
 	void Stop() {s.Close();}
 	
-	void GetUserlist(Index<int>& userlist);
 	void StoreImageCache(unsigned hash, const String& image_str);
+	void DereferenceMessages();
 	
+	void Greeting(Stream& in, Stream& out);
 	void Register(Stream& in, Stream& out);
 	void Login(Stream& in, Stream& out);
 	void Logout();
+	int  LoginId(Stream& in);
 	void Join(Stream& in, Stream& out);
 	void Leave(Stream& in, Stream& out);
 	void Location(Stream& in, Stream& out);
@@ -207,6 +208,7 @@ protected:
 	// Temporary
 	ArrayMap<int, ActiveSession> sessions;
 	VectorMap<int, int> user_session_ids;
+	VectorMap<int64, int> login_session_ids;
 	VectorMap<unsigned, MessageRef> messages;
 	TcpSocket listener;
 	Index<String> blacklist;
@@ -265,10 +267,12 @@ public:
 	void StartListen() {running = true; stopped = false; Thread::Start(THISBACK(Listen));}
 	void HandleSocket(One<TcpSocket> s);
 	
-	void JoinChannel(const String& channel, ActiveSession& user);
-	void LeaveChannel(const String& channel, ActiveSession& user);
+	void JoinChannel(const String& channel, int user_id);
+	void LeaveChannel(const String& channel, int user_id);
 	void SendMessage(int sender_id, const String& msg, const Index<int>& user_list);
-	void SendToAll(ActiveSession& user, String msg);
+	void SendToAll(int user_id, String msg);
+	void GetUserlist(Index<int>& userlist, int user_id);
+	int64 GetNewLoginId();
 	const MessageRef&	IncReference(const String& msg, int ref_count);
 	MessageRef&			GetReference(unsigned hash);
 	void				DecReference(MessageRef& ref);

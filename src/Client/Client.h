@@ -46,6 +46,7 @@ struct Channel : Moveable<Channel> {
 	Vector<ChannelMessage> messages;
 	Index<int> userlist;
 	int unread = 0;
+	Mutex lock;
 	
 	void Post(int user_id, String user_name, const String& msg);
 };
@@ -93,6 +94,8 @@ public:
 
 class Client : public TopWindow {
 	
+	static const bool continuous = false;
+	
 	// Persistent
 	int user_id = -1;
 	String pass;
@@ -106,6 +109,7 @@ class Client : public TopWindow {
 	String user_name;
 	String addr = "127.0.0.1";
 	One<TcpSocket> s;
+	int64 login_id = 0;
 	int port = 17000;
 	int age = 0;
 	bool gender = 0;
@@ -136,6 +140,7 @@ public:
 	
 	void MainMenu(Bar& bar);
 	bool Connect();
+	void Disconnect();
 	void CloseConnection() {if (!s.IsEmpty()) s->Close(); is_logged_in = false;}
 	bool LoginScript();
 	bool RegisterScript();
@@ -173,7 +178,7 @@ public:
 	void RefreshNearest();
 	void Command(String cmd);
 	
-	bool IsConnected() {return !s.IsEmpty() && s->IsOpen() && is_logged_in;}
+	bool IsConnected() {return is_logged_in;}
 	
 };
 

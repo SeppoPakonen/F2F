@@ -160,8 +160,9 @@ void Server::Data() {
 			int row = 0;
 			for(int i = 0; i < sessions.GetCount(); i++) {
 				const ActiveSession& s = sessions[i];
-				UserDatabase& db = GetDatabase(s.user_id);
-				userlist.Set(row, 0, s.user_id);
+				if (s.last_user_id == -1) continue;
+				UserDatabase& db = GetDatabase(s.last_user_id);
+				userlist.Set(row, 0, s.last_user_id);
 				userlist.Set(row, 1, db.name);
 				row++;
 			}
@@ -326,23 +327,8 @@ void Server::Listen() {
 						int id = session_counter++;
 						ses->sess_id = id;
 						
-						int pre_cmd;
-						ses->s.Get(&pre_cmd, sizeof(int));
-						
-						// Is greeting request
-						if (pre_cmd == 0) {
-							String title = Config::server_title;
-							int i = title.GetCount();
-							ses->s.Put(&i, sizeof(int));
-							ses->s.Put(title.Begin(), title.GetCount());
-							i = sessions.GetCount();
-							ses->s.Put(&i, sizeof(int));
-							i = Config::max_sessions;
-							ses->s.Put(&i, sizeof(int));
-							ses->s.Close();
-						}
-						// Is normal session
-						else if (sessions.GetCount() < Config::max_sessions) {
+						// Normal session
+						if (sessions.GetCount() < Config::max_sessions) {
 							lock.EnterWrite();
 							sessions.Add(id, ses.Detach()).Start();
 							lock.LeaveWrite();
@@ -385,15 +371,35 @@ void Server::Listen() {
 	stopped = true;
 }
 
-void Server::SendToAll(ActiveSession& user, String msg) {
+void Server::SendToAll(int user_id, String msg) {
 	lock.EnterWrite();
 	Index<int> users;
-	user.GetUserlist(users);
-	SendMessage(user.user_id, msg, users);
+	GetUserlist(users, user_id);
+	SendMessage(user_id, msg, users);
 	lock.LeaveWrite();
 }
 
-void Server::JoinChannel(const String& channel, ActiveSession& user) {
+void Server::GetUserlist(Index<int>& userlist, int user_id) {
+	UserDatabase& db = GetDatabase(user_id);
+	for(int i = 0; i < db.channels.GetCount(); i++) {
+		int j = db.channels[i];
+		if (j >= 0 && j < this->db.channels.GetCount()) {
+			const Channel& ch = this->db.channels[j];
+			for(int j = 0; j < ch.users.GetCount(); j++)
+				userlist.FindAdd(ch.users[j]);
+		}
+	}
+}
+
+int64 Server::GetNewLoginId() {
+	while (true) {
+		int64 login_id = Random(INT_MAX) | (Random(INT_MAX) << 32);
+		if (login_session_ids.Find(login_id) == -1)
+			return login_id;
+	}
+}
+
+void Server::JoinChannel(const String& channel, int user_id) {
 	if (channel.IsEmpty()) return;
 	lock.EnterWrite();
 	int id = db.channels.Find(channel);
@@ -403,24 +409,24 @@ void Server::JoinChannel(const String& channel, ActiveSession& user) {
 		ch.name = channel;
 	}
 	Channel& ch = db.channels.Get(channel);
-	SendMessage(user.user_id, "join " + IntStr(user.user_id) + " " + channel, ch.users);
-	ch.users.FindAdd(user.user_id);
-	UserDatabase& user_db = GetDatabase(user.user_id);
+	SendMessage(user_id, "join " + IntStr(user_id) + " " + channel, ch.users);
+	ch.users.FindAdd(user_id);
+	UserDatabase& user_db = GetDatabase(user_id);
 	user_db.channels.Add(id);
 	user_db.Flush();
 	db.Flush();
 	lock.LeaveWrite();
 }
 
-void Server::LeaveChannel(const String& channel, ActiveSession& user) {
+void Server::LeaveChannel(const String& channel, int user_id) {
 	lock.EnterWrite();
 	int id = db.channels.Find(channel);
 	if (id != -1) {
-		UserDatabase& user_db = GetDatabase(user.user_id);
+		UserDatabase& user_db = GetDatabase(user_id);
 		Channel& ch = db.channels[id];
-		ch.users.RemoveKey(user.user_id);
+		ch.users.RemoveKey(user_id);
 		user_db.channels.RemoveKey(id);
-		SendMessage(user.user_id, "leave " + IntStr(user.user_id) + " " + channel, ch.users);
+		SendMessage(user_id, "leave " + IntStr(user_id) + " " + channel, ch.users);
 		db.Flush();
 	}
 	lock.LeaveWrite();
@@ -433,12 +439,7 @@ void Server::SendMessage(int sender_id, const String& msg, const Index<int>& use
 	for(int i = 0; i < user_list.GetCount(); i++) {
 		int user_id = user_list[i];
 		if (user_id == sender_id) continue;
-		int j = user_session_ids.Find(user_id);
-		if (j == -1) continue;
-		j = sessions.Find(user_session_ids[j]);
-		if (j == -1) continue;
-		ActiveSession& as = sessions[j];
-		UserDatabase& user_db = GetDatabase(as.user_id);
+		UserDatabase& user_db = GetDatabase(user_id);
 		user_db.lock.Enter();
 		InboxMessage& m = user_db.inbox.Add();
 		m.sender_id = sender_id;

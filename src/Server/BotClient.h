@@ -29,6 +29,7 @@ protected:
 	Index<String> joined_channels;
 	String user_name, pass;
 	One<TcpSocket> s;
+	int64 login_id = 0;
 	int age = 0, gender = 0;
 	int id = -1;
 	int user_id = -1;

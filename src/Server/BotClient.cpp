@@ -25,10 +25,6 @@ void Client::Run() {
 		bool logged_in = false;
 		
 		try {
-			int pre_cmd = -1;
-			int r = s->Put(&pre_cmd, sizeof(int));
-			if (r != sizeof(int)) throw Exc("Precommand skipping failed");
-			
 			while (!Thread::IsShutdownThreads() && s->IsOpen() && running) {
 				
 				int action;
@@ -144,6 +140,8 @@ void Client::Login() {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Login failed");
 	
+	login_id = in.Get64();
+	
 	int name_len = in.Get32();
 	user_name = in.Get(name_len);
 	
@@ -157,6 +155,8 @@ bool Client::Set(const String& key, const String& value) {
 	StringStream out, in;
 	
 	out.Put32(30);
+	
+	out.Put64(login_id);
 	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
@@ -181,6 +181,8 @@ void Client::Get(const String& key, String& value) {
 	
 	out.Put32(40);
 	
+	out.Put64(login_id);
+	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
 	
@@ -201,6 +203,8 @@ void Client::Join(String channel) {
 	StringStream out, in;
 	
 	out.Put32(50);
+	
+	out.Put64(login_id);
 	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
@@ -227,6 +231,8 @@ void Client::Leave(String channel) {
 	
 	out.Put32(60);
 	
+	out.Put64(login_id);
+	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
 	out.Put(channel.Begin(), channel.GetCount());
@@ -247,6 +253,8 @@ bool Client::Message(int recv_user_id, const String& msg) {
 	
 	out.Put32(70);
 	
+	out.Put64(login_id);
+	
 	out.Put32(recv_user_id);
 	out.Put32(msg.GetCount());
 	out.Put(msg.Begin(), msg.GetCount());
@@ -263,6 +271,8 @@ void Client::Poll() {
 	StringStream out, in;
 	
 	out.Put32(80);
+	
+	out.Put64(login_id);
 	
 	Call(out, in);
 	
@@ -343,6 +353,8 @@ void Client::SendLocation(const Location& l) {
 	
 	out.Put32(90);
 	
+	out.Put64(login_id);
+	
 	out.Put(&l.latitude, sizeof(l.latitude));
 	out.Put(&l.longitude, sizeof(l.longitude));
 	out.Put(&l.elevation, sizeof(l.elevation));
@@ -360,6 +372,8 @@ bool Client::ChannelMessage(String channel, const String& msg) {
 	StringStream out, in;
 	
 	out.Put32(100);
+	
+	out.Put64(login_id);
 	
 	out.Put32(channel.GetCount());
 	out.Put(channel.Begin(), channel.GetCount());

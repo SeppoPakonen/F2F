@@ -91,8 +91,6 @@ void Client::MainMenu(Bar& bar) {
 
 bool Client::Connect() {
 	if (s.IsEmpty() || !s->IsOpen()) {
-		is_logged_in = false;
-		
 		if (!s.IsEmpty()) s.Clear();
 		s.Create();
 		
@@ -100,14 +98,12 @@ bool Client::Connect() {
 			Print("Client " + IntStr(user_id) + " Unable to connect to server!");
 			return false;
 		}
-		
-		// Pre-command: skip pre-commands
-		int i = -1;
-		int r = s->Put(&i, sizeof(int));
-		if (r != sizeof(int))
-			return false;
 	}
 	return true;
+}
+
+void Client::Disconnect() {
+	s.Clear();
 }
 
 bool Client::RegisterScript() {
@@ -126,11 +122,6 @@ bool Client::RegisterScript() {
 
 bool Client::LoginScript() {
 	if (!is_logged_in) {
-		lock.Enter();
-		users.Clear();
-		channels.Clear();
-		lock.Leave();
-		
 		try {
 			Login();
 			RefreshChannellist();
@@ -233,21 +224,24 @@ String Client::LoadImageCache(unsigned hash) {
 	return LoadFile(img_file);
 }
 
+
 void Client::HandleConnection() {
 	Print("Client " + IntStr(user_id) + " Running");
 	
 	int count = 0;
 	
+	
 	while (!Thread::IsShutdownThreads() && running) {
 		
-		Connect();
+		if (continuous)
+			Connect();
 		
 		try {
-			while (!Thread::IsShutdownThreads() && s->IsOpen() && running) {
+			while (!Thread::IsShutdownThreads() && running) {
 				RegisterScript();
 				LoginScript();
-				
 				Poll();
+				
 				Sleep(1000);
 				count++;
 			}
@@ -265,8 +259,10 @@ void Client::HandleConnection() {
 			break;
 		}
 		
-		s.Clear();
 		is_logged_in = false;
+		
+		if (continuous)
+			Disconnect();
 	}
 	
 	Print("Client " + IntStr(user_id) + " Stopping");
@@ -281,18 +277,28 @@ void Client::Call(Stream& out, Stream& in) {
 	int out_size = out_str.GetCount();
 	
 	call_lock.Enter();
+	
+	if (!continuous) {
+		s.Clear();
+		Connect();
+	}
+	
 	r = s->Put(&out_size, sizeof(out_size));
-	if (r != sizeof(out_size)) {call_lock.Leave(); throw Exc("Data sending failed");}
+	if (r != sizeof(out_size)) {if (!continuous) Disconnect(); call_lock.Leave(); throw Exc("Data sending failed");}
 	r = s->Put(out_str.Begin(), out_str.GetCount());
-	if (r != out_str.GetCount()) {call_lock.Leave(); throw Exc("Data sending failed");}
+	if (r != out_str.GetCount()) {if (!continuous) Disconnect(); call_lock.Leave(); call_lock.Leave(); throw Exc("Data sending failed");}
 	
 	s->Timeout(30000);
 	int in_size;
 	r = s->Get(&in_size, sizeof(in_size));
-	if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) {call_lock.Leave(); throw Exc("Received invalid size");}
+	if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) {if (!continuous) Disconnect(); call_lock.Leave(); call_lock.Leave(); throw Exc("Received invalid size");}
 	
 	String in_data = s->Get(in_size);
-	if (in_data.GetCount() != in_size) {call_lock.Leave(); throw Exc("Received invalid data");}
+	if (in_data.GetCount() != in_size) {if (!continuous) Disconnect(); call_lock.Leave(); call_lock.Leave(); throw Exc("Received invalid data");}
+	
+	if (!continuous)
+		Disconnect();
+	
 	call_lock.Leave();
 	
 	int64 pos = in.GetPos();
@@ -326,6 +332,8 @@ void Client::Login() {
 	int ret = in.Get32();
 	if (ret != 0) throw Exc("Login failed");
 	
+	login_id = in.Get64();
+	
 	int name_len = in.Get32();
 	if (name_len <= 0) throw Exc("Login failed");
 	user_name = in.Get(name_len);
@@ -340,6 +348,8 @@ bool Client::Set(const String& key, const String& value) {
 	StringStream out, in;
 	
 	out.Put32(30);
+	
+	out.Put64(login_id);
 	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
@@ -364,6 +374,8 @@ void Client::Get(const String& key, String& value) {
 	
 	out.Put32(40);
 	
+	out.Put64(login_id);
+	
 	out.Put32(key.GetCount());
 	out.Put(key.Begin(), key.GetCount());
 	
@@ -384,6 +396,8 @@ void Client::Join(String channel) {
 	StringStream out, in;
 	
 	out.Put32(50);
+	
+	out.Put64(login_id);
 	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
@@ -412,6 +426,8 @@ void Client::Leave(String channel) {
 	
 	out.Put32(60);
 	
+	out.Put64(login_id);
+	
 	int ch_len = channel.GetCount();
 	out.Put32(ch_len);
 	out.Put(channel.Begin(), channel.GetCount());
@@ -433,6 +449,8 @@ void Client::Message(int recv_user_id, const String& msg) {
 	
 	out.Put32(70);
 	
+	out.Put64(login_id);
+	
 	out.Put32(recv_user_id);
 	out.Put32(msg.GetCount());
 	out.Put(msg.Begin(), msg.GetCount());
@@ -449,6 +467,8 @@ void Client::Poll() {
 	StringStream out, in;
 	
 	out.Put32(80);
+	
+	out.Put64(login_id);
 	
 	Call(out, in);
 	
@@ -628,6 +648,8 @@ void Client::SendLocation(const Location& l) {
 	
 	out.Put32(90);
 	
+	out.Put64(login_id);
+	
 	out.Put(&l.latitude, sizeof(l.latitude));
 	out.Put(&l.longitude, sizeof(l.longitude));
 	out.Put(&l.elevation, sizeof(l.elevation));
@@ -645,6 +667,8 @@ void Client::SendChannelMessage(String channel, const String& msg) {
 	StringStream out, in;
 	
 	out.Put32(100);
+	
+	out.Put64(login_id);
 	
 	out.Put32(channel.GetCount());
 	out.Put(channel.Begin(), channel.GetCount());
@@ -911,6 +935,7 @@ void Client::Command(String cmd) {
 			}
 			catch (Exc e) {
 				ch.Post(-1, "F2F client", "Problems sending messages...");
+				is_logged_in = false;
 			}
 			PostCallback(THISBACK(RefreshGui));
 		}
@@ -926,6 +951,7 @@ void Client::Command(String cmd) {
 			}
 			catch (Exc e) {
 				ch.Post(-1, "F2F client", "Problems sending messages...");
+				is_logged_in = false;
 			}
 		} else {
 			int recv_id = ScanInt(active_channel.Mid(4));
@@ -937,6 +963,7 @@ void Client::Command(String cmd) {
 			}
 			catch (Exc e) {
 				ch.Post(-1, "F2F client", "Problems sending messages...");
+				is_logged_in = false;
 			}
 		}
 		PostCallback(THISBACK(RefreshGui));
@@ -982,12 +1009,14 @@ void Client::JoinChannel() {
 
 
 void Channel::Post(int user_id, String user_name, const String& msg) {
+	lock.Enter();
 	ChannelMessage& m = messages.Add();
 	m.received = GetSysTime();
 	m.message = msg;
 	m.sender_id = user_id;
 	m.sender_name = user_name;
 	unread++;
+	lock.Leave();
 }
 
 
@@ -1379,20 +1408,38 @@ void SelectServerDialog::TestConnection(int i) {
 		
 		TimeStop ts;
 		
-		int r, datalen = 0;
+		StringStream ss;
+		int greeting_cmd = 0;
+		ss.Put(&greeting_cmd, sizeof(int));
+		
+		ss.Seek(0);
+		String data = ss.Get(ss.GetSize());
+		
+		int r, datalen = data.GetCount();
 		r = sock.Put(&datalen, sizeof(int));
 		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
-		int greet_len;
-		r = sock.Get(&greet_len, sizeof(int));
-		if (r != sizeof(int) || greet_len < 0 || greet_len > 1000) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
+		r = sock.Put(data.Begin(), datalen);
+		if (r != datalen) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
-		server.greeting = sock.Get(greet_len);
 		
-		r = sock.Get(&server.sessions, sizeof(int));
+		ss.Seek(0);
+		r = sock.Get(&datalen, sizeof(int));
 		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
-		r = sock.Get(&server.max_sessions, sizeof(int));
+		ss << sock.Get(datalen);
+		ss.Seek(0);
+		
+		int greet_len;
+		r = ss.Get(&greet_len, sizeof(int));
+		if (r != sizeof(int) || greet_len < 0 || greet_len > 1000) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
+		
+		server.greeting = ss.Get(greet_len);
+		
+		r = ss.Get(&server.sessions, sizeof(int));
+		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
+		
+		r = ss.Get(&server.max_sessions, sizeof(int));
 		if (r != sizeof(int)) throw Exc("Connection failed " + server.addr + ":" + IntStr(server.port));
 		
 		server.elapsed = ts.Elapsed();
