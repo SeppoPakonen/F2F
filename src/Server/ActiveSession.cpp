@@ -465,7 +465,7 @@ void ActiveSession::Join(Stream& in, Stream& out) {
 		server->lock.EnterWrite();
 		ch_id = server->db.channels.Find(ch_name);
 		if (ch_id == -1) {
-			server->db.channels.GetCount();
+			ch_id = server->db.channels.GetCount();
 			server->db.channels.Add(ch_name).name = ch_name;
 			server->db.Flush();
 		}
