@@ -49,6 +49,20 @@ public class MessagesActivity extends Activity {
         AppService.last.isViewingMessages(false);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (AppService.last != null)
+            AppService.last.isMessagesPaused(true);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (AppService.last != null)
+            AppService.last.isMessagesPaused(false);
+    }
+
     void postAddMessages() {
         runOnUiThread(new Runnable() {
             @Override

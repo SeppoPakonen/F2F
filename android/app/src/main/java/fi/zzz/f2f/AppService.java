@@ -102,6 +102,7 @@ public class AppService extends Service {
     public boolean gender = true;
     public boolean is_logged_in = false;
     public boolean is_viewing_messages = false;
+    public boolean is_messages_paused = false;
     public DataInputStream input;
     public DataOutputStream output;
     public Lock call_lock = new ReentrantLock();
@@ -326,9 +327,13 @@ public class AppService extends Service {
         is_viewing_messages = b;
     }
 
+    void isMessagesPaused(boolean b) {
+        is_messages_paused = b;
+    }
+
     void NotifyNewChannelMessage(String channel, String user, String message) {
 
-        if (is_viewing_messages && channel.equals(active_channel))
+        if (is_viewing_messages && channel.equals(active_channel) && !is_messages_paused)
             return;
 
         NotificationCompat.Builder builder =
