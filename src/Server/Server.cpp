@@ -103,6 +103,7 @@ void Server::MainMenu(Bar& bar) {
 		bar.Add("Close session connection", THISBACK(CloseSession)).Key(K_CTRL|K_C);
 		bar.Separator();
 		bar.Add("Analyze", THISBACK(ChangeLocation)).Key(K_CTRL|K_A);
+		bar.Add("Export some CSV", THISBACK(ExportCSV)).Key(K_CTRL|K_E);
 	});
 }
 
@@ -550,6 +551,40 @@ void Server::ChangeLocation() {
 	}
 }
 
+void Server::ExportCSV() {
+	int ch_id = 0;
+	
+	FileOut fout(ConfigFile("gps.csv"));
+	fout << "longitude, latitude, elevation, time\n";
+	
+	int user_count = db.GetUserCount();
+	for(int i = 0; i < user_count; i++) {
+		UserDatabase& db0 = GetDatabase(i);
+		if (db0.channels.Find(ch_id) == -1) continue;
+		
+		db0.lock.Enter();
+		
+		int loc_count = db0.location.GetSize() / (3*sizeof(double) + sizeof(Time));
+		db0.location.Seek(0);
+		int j = 0;
+		double prev_lon, prev_lat;
+		while (!db0.location.IsEof()) {
+			double lon, lat, elev;
+			Time t;
+			db0.location.Get(&lon, sizeof(double));
+			db0.location.Get(&lat, sizeof(double));
+			db0.location.Get(&elev, sizeof(double));
+			db0.location.Get(&t, sizeof(Time));
+			
+			fout << lon << ", " << lat << ", " << elev << ", " << Format("%", t) << "\n";
+		}
+		
+		db0.lock.Leave();
+	}
+	
+	fout.Close();
+}
+
 void Server::Analyze(String ch) {
 	int ch_id = db.channels.Find(ch);
 	
@@ -661,7 +696,6 @@ void Server::Analyze(String ch) {
 			}
 		}
 	}
-	
 	
 	analyze_mapctrl.map.overlay = ib;
 	analyze_mapctrl.map.Refresh();

@@ -258,6 +258,7 @@ public:
 	void CloseSession();
 	void Analyze(String ch);
 	void ChangeLocation();
+	void ExportCSV();
 	
 	void Print(const String& s);
 	void Data();
