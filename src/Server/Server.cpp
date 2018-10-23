@@ -198,7 +198,7 @@ void Server::Data() {
 				
 				if (usertab == 0) {
 					for(int i = 0; i < db.channels.GetCount(); i++) {
-						userchannels.Set(i, 0, db.channels[i]);
+						userchannels.Set(i, 0, this->db.channels.GetKey(db.channels[i]));
 					}
 					userchannels.SetCount(db.channels.GetCount());
 					int row = 0;
@@ -412,7 +412,7 @@ void Server::JoinChannel(const String& channel, int user_id) {
 	SendMessage(user_id, "join " + IntStr(user_id) + " " + channel, ch.users);
 	ch.users.FindAdd(user_id);
 	UserDatabase& user_db = GetDatabase(user_id);
-	user_db.channels.Add(id);
+	user_db.channels.FindAdd(id);
 	user_db.Flush();
 	db.Flush();
 	lock.LeaveWrite();
@@ -662,8 +662,13 @@ void Server::Analyze(String ch) {
 		}
 	}
 	
+	
 	analyze_mapctrl.map.overlay = ib;
 	analyze_mapctrl.map.Refresh();
+	
+	PNGEncoder png;
+	png.SaveFile(ConfigFile("heatmap.png"), analyze_mapctrl.map.overlay);
+	png.SaveFile(ConfigFile("map.png"), analyze_mapctrl.map.map);
 }
 
 void DrawRect(ImageBuffer& ib, Rect r, RGBA rgba) {
