@@ -28,16 +28,16 @@ String RandomPassword(int length) {
 
 int ImageHash(const String& str)
 {
-	const char* ptr = str.Begin();
+	const char* s = str.Begin();
 	int count = str.GetCount();
 	
-	int sum = 0;
-	for(int i = 0; i < count; i++) {
-		sum += (int)*ptr;
-		ptr++;
-	}
-	
-	return sum;
+	int hash = 1234567890;
+
+	const char *e = s + count;
+	while(s < e)
+		hash = ((hash << 5) - hash) ^ *s++;
+
+	return hash;
 }
 
 
