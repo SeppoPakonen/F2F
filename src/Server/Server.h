@@ -24,7 +24,7 @@ extern IniInt master_port;
 
 String RandomPassword(int length);
 void DrawRect(ImageBuffer& ib, Rect r, RGBA rgba);
-unsigned ImageHash(const String& s);
+int ImageHash(const String& s);
 
 enum {
 	NICK,
@@ -90,7 +90,7 @@ public:
 	ArrayMap<int64, UserSessionLog> sessions;
 	Index<int> channels;
 	String name, profile_img;
-	unsigned profile_img_hash = 0;
+	int profile_img_hash = 0;
 	unsigned passhash = 0;
 	unsigned age = 0;
 	Time joined, lastlogin;
@@ -168,7 +168,7 @@ public:
 	void Start() {Thread::Start(THISBACK(Run));}
 	void Stop() {s.Close();}
 	
-	void StoreImageCache(unsigned hash, const String& image_str);
+	void StoreImageCache(int hash, const String& image_str);
 	void DereferenceMessages();
 	
 	void Greeting(Stream& in, Stream& out);

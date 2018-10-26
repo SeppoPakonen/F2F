@@ -634,10 +634,10 @@ void ActiveSession::ChannelMessage(Stream& in, Stream& out) {
 	out.Put32(0);
 }
 
-void ActiveSession::StoreImageCache(unsigned hash, const String& image_str) {
+void ActiveSession::StoreImageCache(int hash, const String& image_str) {
 	String img_folder = ConfigFile("images");
 	RealizeDirectory(img_folder);
-	String img_file = AppendFileName(img_folder, IntStr64(hash) + ".bin");
+	String img_file = AppendFileName(img_folder, IntStr(hash) + ".bin");
 	FileOut fout(img_file);
 	fout << image_str;
 	fout.Close();
