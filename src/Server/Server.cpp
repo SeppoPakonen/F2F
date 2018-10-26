@@ -394,7 +394,7 @@ void Server::GetUserlist(Index<int>& userlist, int user_id) {
 
 int64 Server::GetNewLoginId() {
 	while (true) {
-		int64 login_id = Random(INT_MAX) | (Random(INT_MAX) << 32);
+		int64 login_id = (int64)Random(INT_MAX) | ((int64)Random(INT_MAX) << 32);
 		if (login_session_ids.Find(login_id) == -1)
 			return login_id;
 	}

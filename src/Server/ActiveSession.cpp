@@ -19,6 +19,8 @@ void ActiveSession::Run() {
 	Print("Session " + IntStr(sess_id) + " started handling socket from " + s.GetPeerAddr());
 	int count = 0;
 	
+	struct NoPrintExc : public String {NoPrintExc(String s) : String(s) {}};
+	
 	String hex("0123456789ABCDEF");
 	try {
 		
@@ -26,7 +28,7 @@ void ActiveSession::Run() {
 			int r;
 			int in_size = 0;
 			r = s.Get(&in_size, sizeof(in_size));
-			if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) throw Exc("Received invalid size " + IntStr(in_size));
+			if (r != sizeof(in_size) || in_size < 0 || in_size >= 10000000) throw NoPrintExc("Received invalid size " + IntStr(in_size));
 			
 			String in_data = s.Get(in_size);
 			if (in_data.GetCount() != in_size) throw Exc("Received invalid data");
@@ -85,6 +87,9 @@ void ActiveSession::Run() {
 			
 			count++;
 		}
+	}
+	catch (NoPrintExc e) {
+		
 	}
 	catch (Exc e) {
 		Print("Error processing client from: " + s.GetPeerAddr() + " Reason: " + e);
@@ -205,8 +210,6 @@ void ActiveSession::Logout() {
 	server->lock.EnterWrite();
 	server->user_session_ids.RemoveKey(last_user_id);
 	server->lock.LeaveWrite();
-	
-	Print("Logged out");
 	
 	if (last_login_id != 0) {
 		UserDatabase& db = GetDatabase(last_user_id);
