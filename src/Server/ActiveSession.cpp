@@ -6,10 +6,10 @@ ActiveSession::ActiveSession() {
 }
 
 void ActiveSession::Print(const String& s) {
-	if (last_user_id < 0) return;
+	if (last_user_id < 0 || last_login_id == 0) return;
 	UserDatabase& db = GetDatabase(last_user_id);
 	db.lock.Enter();
-	UserSessionLog& ses = db.sessions.GetAdd(sess_id);
+	UserSessionLog& ses = db.sessions.GetAdd(last_login_id);
 	db.lock.Leave();
 	if (ses.begin == Time(1970,1,1)) ses.begin = GetSysTime();
 	ses.log.Add().Set(s);
@@ -208,11 +208,11 @@ void ActiveSession::Logout() {
 	
 	Print("Logged out");
 	
-	UserDatabase& db = GetDatabase(last_user_id);
-	UserSessionLog& ses = db.sessions.GetAdd(sess_id);
-	ses.end = GetSysTime();
-	
-	db.Deinit();
+	if (last_login_id != 0) {
+		UserDatabase& db = GetDatabase(last_user_id);
+		UserSessionLog& ses = db.sessions.GetAdd(last_login_id);
+		ses.end = GetSysTime();
+	}
 }
 
 void ActiveSession::DereferenceMessages() {
@@ -247,6 +247,7 @@ int ActiveSession::LoginId(Stream& in) {
 	if (user_id < 0)
 		throw Exc("Invalid login id");
 	
+	last_login_id = login_id;
 	last_user_id = user_id;
 	
 	return user_id;

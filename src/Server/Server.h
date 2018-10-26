@@ -86,7 +86,7 @@ public:
 	
 	// Persistent
 	Vector<InboxMessage> inbox;
-	ArrayMap<int, UserSessionLog> sessions;
+	ArrayMap<int64, UserSessionLog> sessions;
 	Index<int> channels;
 	String name, profile_img;
 	unsigned profile_img_hash = 0;
@@ -155,6 +155,7 @@ protected:
 	
 	int sess_id = -1;
 	int last_user_id = -1;
+	int64 last_login_id = 0;
 	
 	Vector<LogItem> log;
 	
