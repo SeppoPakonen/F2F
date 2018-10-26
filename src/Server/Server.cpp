@@ -7,7 +7,7 @@ INI_INT(port, 17000, "Server port");
 INI_INT(max_sessions, 10000, "Max clients");
 INI_INT(max_image_size, 100000, "Max profile image size in bytes");
 INI_INT(max_set_string_len, 1000000, "Max set function string size in bytes");
-INI_STRING(master_addr, "93.170.105.68", "Master server's address");
+INI_STRING(master_addr, "overlook.zzz.fi", "Master server's address");
 INI_INT(master_port, 17123, "Master server's port");
 
 };

@@ -3,7 +3,7 @@
 
 namespace Config {
 
-INI_STRING(master_addr, "93.170.105.68", "Master server's address");
+INI_STRING(master_addr, "overlook.zzz.fi", "Master server's address");
 INI_INT(master_port, 17123, "Master server's port");
 
 };
