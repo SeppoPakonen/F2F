@@ -86,7 +86,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (!action.isEmpty()) {
                 if (action == Intent.ACTION_MAIN) {
 
-                } else {
+                }
+                else {
                     AppService.last.setActiveChannel(action);
                     startMessages();
                 }
@@ -98,59 +99,61 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Intent i = new Intent(this, AppService.class);
                 i.putExtra("name", "F2F service");
                 startService(i);
-            }
 
 
-            // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-            SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                    .findFragmentById(R.id.map);
-            mapFragment.getMapAsync(this);
+                // Obtain the SupportMapFragment and get notified when the map is ready to be used.
+                SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                        .findFragmentById(R.id.map);
+                mapFragment.getMapAsync(this);
 
 
-            // Navigation bar
-            mDrawerLayout = findViewById(R.id.drawer_layout);
-            NavigationView navigationView = findViewById(R.id.nav_view);
-            navigationView.setNavigationItemSelectedListener(
-                    new NavigationView.OnNavigationItemSelectedListener() {
-                        @Override
-                        public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
-                            // set item as selected to persist highlight
-                            //menuItem.setChecked(true);
+                // Navigation bar
+                mDrawerLayout = findViewById(R.id.drawer_layout);
+                NavigationView navigationView = findViewById(R.id.nav_view);
+                navigationView.setNavigationItemSelectedListener(
+                        new NavigationView.OnNavigationItemSelectedListener() {
+                            @Override
+                            public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+                                // set item as selected to persist highlight
+                                //menuItem.setChecked(true);
 
-                            // close drawer when item is tapped
-                            mDrawerLayout.closeDrawers();
+                                // close drawer when item is tapped
+                                mDrawerLayout.closeDrawers();
 
-                            int id = menuItem.getItemId();
-                            if (id == R.id.nav_settings) {
-                                startSettings();
-                            } else if (id == R.id.nav_messages) {
-                                startMessages();
-                            } else if (id == R.id.channel_users) {
-                                startUsers();
+                                int id = menuItem.getItemId();
+                                if (id == R.id.nav_settings) {
+                                    startSettings();
+                                } else if (id == R.id.nav_messages) {
+                                    startMessages();
+                                } else if (id == R.id.channel_users) {
+                                    startUsers();
+                                }
+                                // Add code here to update the UI based on the item selected
+                                // For example, swap UI fragments here
+                                return true;
                             }
-                            // Add code here to update the UI based on the item selected
-                            // For example, swap UI fragments here
-                            return true;
-                        }
-                    });
+                        });
 
 
-            // Set the toolbar as the action bar
-            Toolbar toolbar = findViewById(R.id.toolbar);
-            setSupportActionBar(toolbar);
-            toolbar.setTitle("@string/activity_maps");
-            ActionBar actionbar = getSupportActionBar();
-            actionbar.setDisplayHomeAsUpEnabled(true);
-            actionbar.setHomeAsUpIndicator(R.drawable.ic_menu);
+                // Set the toolbar as the action bar
+                Toolbar toolbar = findViewById(R.id.toolbar);
+                setSupportActionBar(toolbar);
+                toolbar.setTitle("@string/activity_maps");
+                ActionBar actionbar = getSupportActionBar();
+                actionbar.setDisplayHomeAsUpEnabled(true);
+                actionbar.setHomeAsUpIndicator(R.drawable.ic_menu);
 
 
-            // Ask location permissions
-            if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
-            } else {
-                startLocationService();
+                // Ask location permissions
+                if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
+                } else {
+                    startLocationService();
+                }
             }
-
+            else {
+                postRefreshGui();
+            }
 
         } catch (java.lang.NullPointerException e) {
             Log.e(TAG, "System error");

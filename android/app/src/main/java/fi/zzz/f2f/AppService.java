@@ -91,6 +91,7 @@ public class AppService extends Service {
     public HashMap<Integer, User> users = new HashMap<>();
     public HashMap<Long, Bitmap> image_cache;
     public HashSet<String> my_channels = new HashSet<>();
+    public Bitmap prev_set_image = null;
     public String user_name;
     public String addr;
     public String active_channel = "";
@@ -196,10 +197,10 @@ public class AppService extends Service {
     }
 
     void startServiceWithNotification() {
-        Intent notificationIntent = new Intent(getApplicationContext(), MapsActivity.class);
+        Intent notificationIntent = new Intent(getApplicationContext(), AppService.class);
         notificationIntent.setAction(ACTION_MAIN);  // A string containing the action name
-        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
         Bitmap icon = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
 
@@ -214,7 +215,7 @@ public class AppService extends Service {
 //                .setDeleteIntent(contentPendingIntent)  // if needed
                 .build();
         notification.flags = notification.flags | Notification.FLAG_NO_CLEAR;     // NO_CLEAR makes the notification stay when the user performs a "delete all" command
-        startForeground(14125345, notification);
+        startForeground(14125346, notification);
     }
 
     void startLocationService() {
@@ -623,12 +624,15 @@ public class AppService extends Service {
     }
 
     void setImage(Bitmap i) {
+        if (i == prev_set_image)
+            return;
+
         if (i == null) return;
-        long hash = 0;
+        int hash = 0;
         try {
             byte[] hash_bytes = get("profile_image_hash");
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(hash_bytes));
-            hash = swap(in.readInt()) & 0x00000000ffffffffL;
+            hash = swap(in.readInt());
         }
         catch (IOException e) {
             Log.e(TAG, "Getting existing image hash failed");
@@ -645,9 +649,11 @@ public class AppService extends Service {
                 int nh = i.getHeight() / 2;
                 i = Bitmap.createScaledBitmap(i, nw, nh, true);
             } else {
-                if (hash != hash(imgstr)) {
+                int new_hash = hash(imgstr);
+                if (hash != new_hash) {
                     try {
                         set("profile_image", imgstr);
+                        prev_set_image = i;
                     }
                     catch (Exc e) {
                         Log.e(TAG, "Changing profile image failed");
@@ -659,7 +665,7 @@ public class AppService extends Service {
     }
 
     void storeImageCache(byte[] image_str) {
-        long hash = hash(image_str);
+        int hash = hash(image_str);
         String img_file = getApplicationContext().getFilesDir() + "/" + Long.toString(hash) + ".bin";
         try {
             FileOutputStream fout = new FileOutputStream(img_file);
@@ -674,14 +680,14 @@ public class AppService extends Service {
         }
     }
 
-    boolean hasCachedImage(long hash) {
-        String img_file = getApplicationContext().getFilesDir() + "/" + Long.toString(hash) + ".bin";
+    boolean hasCachedImage(int hash) {
+        String img_file = getApplicationContext().getFilesDir() + "/" + Integer.toString(hash) + ".bin";
         File f = new File(img_file);
         return f.exists();
     }
 
-    byte[] loadCachedImage(long hash) {
-        String img_file = getApplicationContext().getFilesDir() + "/" + Long.toString(hash) + ".bin";
+    byte[] loadCachedImage(int hash) {
+        String img_file = getApplicationContext().getFilesDir() + "/" + Integer.toString(hash) + ".bin";
         try {
             long size = new File(img_file).length();
             byte[] data = new byte[(int)size];
@@ -820,15 +826,15 @@ public class AppService extends Service {
         catch (InterruptedException e) {}
     }
 
-    long hash(byte[] s) {
+    int hash(byte[] s) {
         return memhash(s, s.length);
     }
 
-    long memhash(byte[] ptr, int count) {
+    int memhash(byte[] ptr, int count) {
         int hash = 1234567890;
-        for (int i = 0; i < count; i++)
-            hash = ((hash << 5) - hash) ^ ptr[i];
-        return hash & 0x00000000ffffffffL;
+	    for (int i = 0; i < count; i++)
+            hash = ((hash << 5) - hash) ^ (int)ptr[i];
+        return hash;
     }
 
     void writeInt(ByteArrayOutputStream out, int i) {
@@ -1336,7 +1342,7 @@ public class AppService extends Service {
             u.age = swap(in.readInt());
             u.gender = swap(in.readInt()) != 0;
 
-            u.profile_image_hash = swap(in.readInt()) & 0x00000000ffffffffL;
+            u.profile_image_hash = swap(in.readInt());
 
             u.l.setLongitude(swapDouble(in.readDouble()));
             u.l.setLatitude(swapDouble(in.readDouble()));
@@ -1517,7 +1523,7 @@ class User implements Serializable {
 
     public HashSet<String> channels;
     public Location l;
-    public long profile_image_hash = 0;
+    public int profile_image_hash = 0;
     public int age = 0;
     public boolean gender = true;
     public Bitmap profile_image;
