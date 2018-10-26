@@ -28,7 +28,7 @@ String RandomPassword(int length) {
 
 int ImageHash(const String& str)
 {
-	const byte* ptr = (const byte*)str.Begin();
+	const char* ptr = str.Begin();
 	int count = str.GetCount();
 	
 	int sum = 0;
