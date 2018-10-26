@@ -95,7 +95,7 @@ public class SettingsActivity extends Activity {
 
         String name_str = edit_name.getText().toString();
         String age_str = edit_age.getText().toString();
-        MapsActivity.last.settingsFinish(
+        AppService.last.settingsFinish(
                 name_str,
                 Integer.parseInt(age_str),
                 edit_gender.getSelectedItemPosition() != 0,

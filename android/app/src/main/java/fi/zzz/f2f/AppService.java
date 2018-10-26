@@ -108,86 +108,30 @@ public class AppService extends Service {
     public Lock call_lock = new ReentrantLock();
     public Lock lock = new ReentrantLock();
 
-    // Messenger object used by clients to send messages to IncomingHandler
-    Messenger mMessenger = new Messenger(new IncomingHandler());
-    Messenger mClient;
 
-    // Incoming messages Handler
-    class IncomingHandler extends Handler {
-        @Override
-        public void handleMessage(Message msg) {
-            if (msg.replyTo != null)
-                mClient = msg.replyTo;
-            Bundle bundle = msg.getData();
-            switch (msg.what) {
-                case AppService.REGISTER:
-                    handleRegister();
-                    sendPostRefreshGui();
-                    break;
 
-                case AppService.SENDLOCATION:
-                    double lon = (double)bundle.getSerializable("lon");
-                    double lat = (double)bundle.getSerializable("lat");
-                    double alt = (double)bundle.getSerializable("alt");
-                    Location loc = new Location("");
-                    loc.setLongitude(lon);
-                    loc.setLatitude(lat);
-                    loc.setAltitude(alt);
-                    startSendLocation(loc);
-                    break;
 
-                case CHANGECHANNEL:
-                    String ch = (String)bundle.getSerializable("ch");
-                    changeChannel(ch);
-                    break;
-
-                case JOINCHANNEL:
-                    ch = (String)bundle.getSerializable("ch");
-                    startJoinChannel(ch);
-                    break;
-
-                case LEAVECHANNEL:
-                    ch = (String)bundle.getSerializable("ch");
-                    startLeaveChannel(ch);
-                    break;
-
-                case SENDMESSAGE:
-                    String m = (String)bundle.getSerializable("msg");
-                    startSendMessage(m);
-                    break;
-
-                case SETUPFINISH:
-                    setup_name = (String)bundle.getSerializable("setup_name");
-                    setup_age = (int)bundle.getSerializable("setup_age");
-                    setup_gender = (boolean)bundle.getSerializable("setup_gender");
-                    storeThis();
-                    startThread();
-                    break;
-
-                case SETTINGS:
-                    setup_name = (String)bundle.getSerializable("setup_name");
-                    setup_age = (int)bundle.getSerializable("setup_age");
-                    setup_gender = (boolean)bundle.getSerializable("setup_gender");
-                    BitmapDataObject bmo = (BitmapDataObject)bundle.getSerializable("profile_image");
-                    profile_image = bmo.currentImage;
-                    applySettings();
-                    break;
-
-                case ADDMESSAGES:
-                    sendAddMessages();
-                    break;
-
-                case SETPROFILEIMAGE:
-                    bmo = (BitmapDataObject)bundle.getSerializable("profile_image");
-                    profile_image = bmo.currentImage;
-                    storeThis();
-                    break;
-
-                default:
-                    super.handleMessage(msg);
-            }
-        }
+    public void setupFinish(String name, int age, boolean gender) {
+        setup_name = name;
+        setup_age = age;
+        setup_gender = gender;
+        storeThis();
+        startThread();
     }
+
+    public void settingsFinish(String name, int age, boolean gender, Bitmap profile_image) {
+        this.setup_name = name;
+        this.setup_age = age;
+        this.setup_gender = gender;
+        this.profile_image = profile_image;
+        applySettings();
+    }
+
+    public void setProfileImage(Bitmap bm) {
+        profile_image = bm;
+        storeThis();
+    }
+
 
     // Try to keep process alive
     PowerManager powerManager;
@@ -221,14 +165,11 @@ public class AppService extends Service {
         return START_STICKY;
     }
 
-    /*
-    Return our Messenger interface for sending messages to
-    the service by the clients.
-    */
+
     @Override
     public IBinder onBind(Intent intent) {
         Log.d(TAG, "onBind done");
-        return mMessenger.getBinder();
+        return null;
     }
 
     @Override
@@ -248,6 +189,8 @@ public class AppService extends Service {
         startServiceWithNotification();
         startLocationService();
         startWakeLock();
+
+        handleRegister();
 
         super.onCreate();
     }
@@ -376,8 +319,8 @@ public class AppService extends Service {
         Thread thread = new Thread() {
             @Override
             public void run() {
-                addr = "f2f.zzz.fi";
-                //addr = "192.168.1.106";
+                addr = "overlook.zzz.fi";
+                //addr = "192.168.1.193";
                 port = 17000;
                 connect();
                 registerScript();
@@ -1526,7 +1469,6 @@ public class AppService extends Service {
         Log.i(TAG, "Change channel to " + ch);
 
         setActiveChannel(ch);
-        sendPostRefreshGui();
     }
 
     void setActiveChannel(String s) {
@@ -1541,95 +1483,27 @@ public class AppService extends Service {
 
 
     void sendStartOnboarding() {
-        try {
-            Message msg = Message.obtain(null, AppService.STARTONBOARDING);
-            mClient.send(msg);
-        }
-        catch (RemoteException e) {}
-        catch (NullPointerException e) {}
+        MapsActivity.last.postStartOnboarding();
     }
 
     void sendPostRefreshGui() {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("channels", channels);
-            bundle.putSerializable("my_channels", my_channels);
-            bundle.putSerializable("active_channel", active_channel);
-            bundle.putSerializable("users", users);
-            Message msg = Message.obtain(null, AppService.POSTREFRESHGUI);
-            msg.setData(bundle);
-            mClient.send(msg);
-        }
-        catch (RemoteException e) {}
-        catch (NullPointerException e) {}
+        MapsActivity.last.postRefreshGui();
     }
 
     void sendPostSetTitle(String title) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("title", title);
-            Message msg = Message.obtain(null, AppService.POSTSETTITLE);
-            msg.setData(bundle);
-            mClient.send(msg);
-        }
-        catch (RemoteException e) {
-
-        }
-        catch (NullPointerException e) {
-
-        }
+        MapsActivity.last.postSetTitle(title);
     }
     
     void sendLocation(int user_id, double lon, double lat) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("user_id", user_id);
-            bundle.putSerializable("lon", lon);
-            bundle.putSerializable("lat", lat);
-            Message msg = Message.obtain(null, AppService.LOCATION);
-            msg.setData(bundle);
-            mClient.send(msg);
-        }
-        catch (RemoteException e) {
-
-        }
-        catch (NullPointerException e) {
-
-        }
+        MapsActivity.last.postSendLocation(user_id, lon, lat);
     }
 
     void sendProfileImage(int user_id, User u) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("user_id", user_id);
-            bundle.putSerializable("profile_image", new BitmapDataObject(u.profile_image));
-            Message msg = Message.obtain(null, AppService.PROFILEIMAGE);
-            msg.setData(bundle);
-            mClient.send(msg);
-        }
-        catch (RemoteException e) {
-
-        }
-        catch (NullPointerException e) {
-
-        }
+        MapsActivity.last.postProfileImage(user_id, u);
     }
 
     void sendAddMessages() {
-        try {
-            Channel ch = channels.get(active_channel);
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("ch", ch);
-            Message msg = Message.obtain(null, AppService.ADDMESSAGES);
-            msg.setData(bundle);
-            mClient.send(msg);
-        }
-        catch (RemoteException e) {
-
-        }
-        catch (NullPointerException e) {
-
-        }
+        MessagesActivity.last.postAddMessages(channels.get(active_channel));
     }
 }
 

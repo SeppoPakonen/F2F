@@ -67,78 +67,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final int REQUEST_PERMISSION_LOCATION = 255; // int should be between 0 and 255
 
 
-    class IncomingHandler extends Handler {
-        @Override
-        public void handleMessage(Message msg) {
-            AppService.last.lock.lock();
-            Bundle bundle = msg.getData();
-            switch (msg.what) {
-                case AppService.STARTONBOARDING:
-                    startOnboarding();
-                    break;
-
-                case AppService.POSTREFRESHGUI:
-                    HashMap<String, Channel> channels = (HashMap<String, Channel>)bundle.getSerializable("channels");
-                    HashSet<String> my_channels = (HashSet<String>)bundle.getSerializable("my_channels");
-                    final String active_channel = (String)bundle.getSerializable("active_channel");
-                    HashMap<Integer, User> users = (HashMap<Integer, User>)bundle.getSerializable("users");
-                    refreshGui(channels, my_channels, active_channel, users);
-                    break;
-
-                case AppService.POSTSETTITLE:
-                    String title = (String)bundle.getSerializable("title");
-                    Toolbar toolbar = findViewById(R.id.toolbar);
-                    toolbar.setTitle(title);
-                    break;
-
-                case AppService.LOCATION:
-                    int user_id = (int)bundle.getSerializable("user_id");
-                    double lon = (double)bundle.getSerializable("lon");
-                    double lat = (double)bundle.getSerializable("lat");
-                    Marker m = markers.get(user_id);
-                    if (m != null)
-                        m.setPosition(new LatLng(lat, lon));
-                    break;
-
-                case AppService.PROFILEIMAGE:
-                    user_id = (int)bundle.getSerializable("user_id");
-                    BitmapDataObject bm = (BitmapDataObject)bundle.getSerializable("profile_image");
-                    m = markers.get(user_id);
-                    if (m != null)
-                        m.setIcon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(bm.currentImage, 128, 128, true))));
-                    break;
-
-                case AppService.ADDMESSAGES:
-                    Channel ch = (Channel)bundle.getSerializable("ch");
-                    MessagesActivity.last.addMessages(ch);
-                    break;
-
-                default:
-                    super.handleMessage(msg);
-            }
-            AppService.last.lock.unlock();
-        }
-    }
-
-    /**
-     * Target we publish for clients to send messages to IncomingHandler.
-     */
-    final Messenger mMessenger = new Messenger(new IncomingHandler());
-    public Messenger mService = null;
-
-    private ServiceConnection mConnection = new ServiceConnection() {
-        public void onServiceConnected(ComponentName className,
-                                       IBinder service) {
-            mService = new Messenger(service);
-            startRegister();
-        }
-
-        public void onServiceDisconnected(ComponentName className) {
-            mService = null;
-        }
-    };
-
-
     public MapsActivity() {
         last = this;
         markers = new HashMap<>();
@@ -158,8 +86,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             if (!action.isEmpty()) {
                 if (action == Intent.ACTION_MAIN) {
 
-                }
-                else {
+                } else {
                     AppService.last.setActiveChannel(action);
                     startMessages();
                 }
@@ -167,10 +94,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
             // Start background service
-            Intent i = new Intent(this, AppService.class);
-            i.putExtra("name", "F2F service");
-            bindService(i, mConnection, Context.BIND_AUTO_CREATE);
-            startService(i);
+            if (AppService.last == null) {
+                Intent i = new Intent(this, AppService.class);
+                i.putExtra("name", "F2F service");
+                startService(i);
+            }
 
 
             // Obtain the SupportMapFragment and get notified when the map is ready to be used.
@@ -195,11 +123,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                             int id = menuItem.getItemId();
                             if (id == R.id.nav_settings) {
                                 startSettings();
-                            }
-                            else if (id == R.id.nav_messages) {
+                            } else if (id == R.id.nav_messages) {
                                 startMessages();
-                            }
-                            else if (id == R.id.channel_users) {
+                            } else if (id == R.id.channel_users) {
                                 startUsers();
                             }
                             // Add code here to update the UI based on the item selected
@@ -221,13 +147,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             // Ask location permissions
             if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
-            }
-            else {
+            } else {
                 startLocationService();
             }
 
-        }
-        catch (java.lang.NullPointerException e) {
+
+        } catch (java.lang.NullPointerException e) {
             Log.e(TAG, "System error");
             System.exit(1);
         }
@@ -255,20 +180,17 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 my_marker.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
 
                 // Called when a new location is found by the network location provider.
-                Thread thread = new Thread() {
-                    @Override
-                    public void run() {
-                        sendLocation(location);
-                    }
-                };
-                thread.start();
+                AppService.last.startSendLocation(location);
             }
 
-            public void onStatusChanged(String provider, int status, Bundle extras) {}
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+            }
 
-            public void onProviderEnabled(String provider) {}
+            public void onProviderEnabled(String provider) {
+            }
 
-            public void onProviderDisabled(String provider) {}
+            public void onProviderDisabled(String provider) {
+            }
         };
 
         // Register the listener with the Location Manager to receive location updates
@@ -293,8 +215,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (UsersActivity.last != null)
             UsersActivity.last.refresh();
     }
-
-
 
 
     @Override
@@ -354,8 +274,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     try {
                         m.setIcon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(u.profile_image, 128, 128, true))));
                         fail = false;
-                    }
-                    catch (IllegalArgumentException e) {
+                    } catch (IllegalArgumentException e) {
                         Log.e(TAG, "IllegalArgumentException");
                     }
                     if (fail) {
@@ -366,6 +285,44 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                     }
                 }
+            }
+        });
+    }
+
+    public void postStartOnboarding() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                startOnboarding();
+            }
+        });
+    }
+
+    public void postRefreshGui() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                refreshGui();
+            }
+        });
+    }
+
+    public void postSendLocation(final int user_id, final double lon, final double lat) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Marker m = markers.get(user_id);
+                if (m != null)
+                    m.setPosition(new LatLng(lat, lon));
+            }
+        });
+    }
+
+    public void postAddMessages(final Channel ch) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                MessagesActivity.last.addMessages(ch);
             }
         });
     }
@@ -391,7 +348,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-    void refreshGui(HashMap<String, Channel> channels, HashSet<String> my_channels, final String active_channel, HashMap<Integer, User> users) {
+    void refreshGui() {
+        HashMap<String, Channel> channels = AppService.last.channels;
+        HashSet<String> my_channels = AppService.last.my_channels;
+        final String active_channel = AppService.last.active_channel;
+        HashMap<Integer, User> users = AppService.last.users;
+
+        AppService.last.lock.lock();
 
         final RadioGroup channel_list = findViewById(R.id.channel_list);
         channel_list.removeAllViews();
@@ -406,16 +369,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         channel_list.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             public void onCheckedChanged(RadioGroup group, int checkedId) {
-                RadioButton checkedRadioButton = (RadioButton)group.findViewById(checkedId);
+                RadioButton checkedRadioButton = (RadioButton) group.findViewById(checkedId);
                 if (checkedRadioButton != null) {
                     checkedRadioButton.setChecked(true);
                     String ch = checkedRadioButton.getText().toString();
                     if (active_channel.equals(ch) == false)
-                        changeChannel(ch);
+                        AppService.last.changeChannel(ch);
                 }
             }
         });
-
 
 
         Button join_button = findViewById(R.id.join);
@@ -426,32 +388,35 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
 
-
         Button leave_button = findViewById(R.id.leave);
-        leave_button .setOnClickListener(new View.OnClickListener() {
+        leave_button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                RadioButton checkedRadioButton = (RadioButton)channel_list.findViewById(channel_list.getCheckedRadioButtonId());
+                RadioButton checkedRadioButton = (RadioButton) channel_list.findViewById(channel_list.getCheckedRadioButtonId());
                 if (checkedRadioButton != null) {
                     String ch = checkedRadioButton.getText().toString();
-                    startLeaveChannel(ch);
+                    AppService.last.startLeaveChannel(ch);
                 }
             }
         });
 
 
-
-        if (!channels.containsKey(active_channel)) { return;}
+        if (!channels.containsKey(active_channel)) {
+            AppService.last.lock.unlock();
+            return;
+        }
 
         Channel ch = channels.get(active_channel);
-        if (ch == null) { return;}
+        if (ch == null) {
+            AppService.last.lock.unlock();
+            return;
+        }
 
         HashSet<Integer> rem_list = new HashSet<>();
         rem_list.addAll(markers.keySet());
 
 
-
         for (Integer user_id : ch.userlist) {
-            rem_list.remove((int)user_id);
+            rem_list.remove((int) user_id);
 
             User u = users.get(user_id);
             if (u.profile_image == null)
@@ -464,8 +429,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                         .position(loc)
                         .icon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(u.profile_image, 128, 128, true)))));
                 markers.put(user_id, m);
-            }
-            else {
+            } else {
                 Marker m = markers.get(user_id);
                 if (m != null)
                     m.setPosition(loc);
@@ -475,12 +439,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         for (Integer user_id : rem_list) {
             try {
                 markers.get(user_id).remove();
+            } catch (NullPointerException e) {
             }
-            catch (NullPointerException e) {}
             markers.remove(user_id);
         }
 
-
+        AppService.last.lock.unlock();
     }
 
 
@@ -497,7 +461,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             public void onClick(DialogInterface dialog, int which) {
                 String channel = input.getText().toString();
                 if (channel.length() > 0)
-                    startJoinChannel(channel);
+                    AppService.last.startJoinChannel(channel);
             }
         });
         builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -510,149 +474,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         builder.show();
     }
 
-
-    void startRegister() {
-        try {
-            Message msg = Message.obtain(null, AppService.REGISTER);
-            msg.replyTo = mMessenger;
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void sendLocation(final Location loc) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("lon", loc.getLongitude());
-            bundle.putSerializable("lat", loc.getLatitude());
-            bundle.putSerializable("alt", loc.getAltitude());
-            Message msg = Message.obtain(null, AppService.SENDLOCATION);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void changeChannel(final String ch) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("ch", ch);
-            Message msg = Message.obtain(null, AppService.CHANGECHANNEL);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void startJoinChannel(final String ch) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("ch", ch);
-            Message msg = Message.obtain(null, AppService.JOINCHANNEL);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void startLeaveChannel(final String ch) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("ch", ch);
-            Message msg = Message.obtain(null, AppService.LEAVECHANNEL);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void startSendMessage(final String m) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("msg", m);
-            Message msg = Message.obtain(null, AppService.SENDMESSAGE);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void setupFinish(String name, int age, boolean gender) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("setup_name", name);
-            bundle.putSerializable("setup_age", age);
-            bundle.putSerializable("setup_gender", gender);
-            Message msg = Message.obtain(null, AppService.SETUPFINISH);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void settingsFinish(String name, int age, boolean gender, Bitmap profile_image) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("setup_name", name);
-            bundle.putSerializable("setup_age", age);
-            bundle.putSerializable("setup_gender", gender);
-            bundle.putSerializable("profile_image", new BitmapDataObject(profile_image));
-            Message msg = Message.obtain(null, AppService.SETTINGS);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void startAddMessages() {
-        try {
-            // return active channel
-            Message msg = Message.obtain(null, AppService.ADDMESSAGES);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
-
-    void startSetProfileImage(Bitmap bm) {
-        try {
-            Bundle bundle = new Bundle();
-            bundle.putSerializable("profile_image", new BitmapDataObject(bm));
-            Message msg = Message.obtain(null, AppService.SETPROFILEIMAGE);
-            msg.setData(bundle);
-            mService.send(msg);
-        } catch (RemoteException e) {
-
-        } catch (NullPointerException e) {
-
-        }
-    }
 }
+
 
 

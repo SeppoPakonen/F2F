@@ -63,11 +63,11 @@ public class MessagesActivity extends Activity {
             AppService.last.isMessagesPaused(false);
     }
 
-    void postAddMessages() {
+    void postAddMessages(final Channel ch) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                MapsActivity.last.startAddMessages();
+                addMessages(ch);
             }
         });
     }
@@ -105,7 +105,7 @@ public class MessagesActivity extends Activity {
                 }
             });
 
-            MapsActivity.last.startSendMessage(message);
+            AppService.last.startSendMessage(message);
         }
     }
 

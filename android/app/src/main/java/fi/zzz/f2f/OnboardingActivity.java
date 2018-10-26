@@ -129,7 +129,7 @@ public class OnboardingActivity extends Activity {
 
                 String name_str = edit_name.getText().toString();
                 String age_str = edit_age.getText().toString();
-                MapsActivity.last.setupFinish(name_str, Integer.parseInt(age_str), edit_gender.getSelectedItemPosition() != 0);
+                AppService.last.setupFinish(name_str, Integer.parseInt(age_str), edit_gender.getSelectedItemPosition() != 0);
                 finish();
             }
         });
@@ -145,7 +145,7 @@ public class OnboardingActivity extends Activity {
                 AppCompatImageView view = findViewById(R.id.profile_image_view);
                 view.setImageBitmap(img);
 
-                MapsActivity.last.startSetProfileImage(img);
+                AppService.last.setProfileImage(img);
             }
             catch (FileNotFoundException e) {
 
