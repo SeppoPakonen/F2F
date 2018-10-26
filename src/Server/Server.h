@@ -24,6 +24,7 @@ extern IniInt master_port;
 
 String RandomPassword(int length);
 void DrawRect(ImageBuffer& ib, Rect r, RGBA rgba);
+unsigned ImageHash(const String& s);
 
 enum {
 	NICK,

@@ -26,6 +26,21 @@ String RandomPassword(int length) {
 
 
 
+unsigned ImageHash(const String& str)
+{
+	const byte* ptr = (const byte*)str.Begin();
+	int count = str.GetCount();
+	
+	unsigned hash = 1234567890U;
+
+	const byte *s = (byte *)ptr;
+	const byte *e = s + count;
+	while(s < e)
+		hash = ((hash << 5) - hash) ^ *s++;
+
+	return hash;
+}
+
 
 Server::Server() {
 	Title("F2F Server");

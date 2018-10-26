@@ -307,7 +307,7 @@ void ActiveSession::Set(Stream& in, Stream& out) {
 		
 		if (value.GetCount() > Config::max_image_size) throw Exc("Invalid image received");
 		db.profile_img = value;
-		db.profile_img_hash = db.profile_img.GetHashValue();
+		db.profile_img_hash = ImageHash(db.profile_img);
 		db.Flush();
 		
 		StoreImageCache(db.profile_img_hash, db.profile_img);
