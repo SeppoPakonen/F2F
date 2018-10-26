@@ -3,10 +3,6 @@ uses
 	plugin/jpg,
 	MapCtrl;
 
-library(WIN32) "ssleay32MT libeay32MT";
-
-library(POSIX) "ssl crypto";
-
 file
 	main.cpp,
 	Server.h,
