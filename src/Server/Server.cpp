@@ -103,7 +103,7 @@ void Server::MainMenu(Bar& bar) {
 		bar.Add("Close session connection", THISBACK(CloseSession)).Key(K_CTRL|K_C);
 		bar.Separator();
 		bar.Add("Analyze", THISBACK(ChangeLocation)).Key(K_CTRL|K_A);
-		bar.Add("Export some CSV", THISBACK(ExportCSV)).Key(K_CTRL|K_E);
+		bar.Add("Export CSV", THISBACK(ExportCSV)).Key(K_CTRL|K_E);
 	});
 }
 
@@ -576,7 +576,7 @@ void Server::ExportCSV() {
 			db0.location.Get(&elev, sizeof(double));
 			db0.location.Get(&t, sizeof(Time));
 			
-			fout << lon << ", " << lat << ", " << elev << ", " << Format("%", t) << "\n";
+			fout << lon << ", " << lat << ", " << elev << ", \"" << Format("%", t) << "\"\n";
 		}
 		
 		db0.lock.Leave();
