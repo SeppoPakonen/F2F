@@ -599,7 +599,7 @@ void Server::ExportCSV() {
 		int loc_count = db0.location.GetSize() / (3*sizeof(double) + sizeof(Time));
 		db0.location.Seek(0);
 		int j = 0;
-		double prev_lon = DBL_MAX, prev_lat = DBL_MAX;
+		double prev_lon = 0, prev_lat = 0;
 		while (!db0.location.IsEof()) {
 			double lon, lat, elev;
 			Time t;
@@ -624,7 +624,7 @@ void Server::ExportCSV() {
 }
 
 String GPXTime(Time t) {
-	return Format("%d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.minute, t.second);
+	return Format("%d-%02d-%02d%s%02d:%02d:%02d%s", t.year, t.month, t.day, "T", t.hour, t.minute, t.second, "Z");
 }
 
 void Server::ExportGPX() {
@@ -649,7 +649,7 @@ void Server::ExportGPX() {
 		int loc_count = db0.location.GetSize() / (3*sizeof(double) + sizeof(Time));
 		db0.location.Seek(0);
 		int j = 0;
-		double prev_lon = DBL_MAX, prev_lat = DBL_MAX;
+		double prev_lon = 0, prev_lat = 0;
 		while (!db0.location.IsEof()) {
 			double lon, lat, elev;
 			Time t;
