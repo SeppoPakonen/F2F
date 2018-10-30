@@ -24,7 +24,24 @@ String RandomPassword(int length) {
 	return s;
 }
 
+double DegreesToRadians(double degrees) {
+  return degrees * M_PI / 180.0;
+}
 
+double CoordinateDistanceKM(Pointf a, Pointf b) {
+	double earth_radius_km = 6371.0;
+	
+	double dLat = DegreesToRadians(b.y - a.y);
+	double dLon = DegreesToRadians(b.x - a.x);
+	
+	a.y = DegreesToRadians(a.y);
+	b.y = DegreesToRadians(b.y);
+	
+	double d = sin(dLat/2) * sin(dLat/2) +
+		sin(dLon/2) * sin(dLon/2) * cos(a.y) * cos(b.y);
+	double c = 2 * atan2(sqrt(d), sqrt(1-d));
+	return earth_radius_km * c;
+}
 
 int ImageHash(const String& str)
 {
@@ -118,6 +135,7 @@ void Server::MainMenu(Bar& bar) {
 		bar.Separator();
 		bar.Add("Analyze", THISBACK(ChangeLocation)).Key(K_CTRL|K_A);
 		bar.Add("Export CSV", THISBACK(ExportCSV)).Key(K_CTRL|K_E);
+		bar.Add("Export GPX", THISBACK(ExportGPX)).Key(K_CTRL|K_G);
 	});
 }
 
@@ -581,7 +599,7 @@ void Server::ExportCSV() {
 		int loc_count = db0.location.GetSize() / (3*sizeof(double) + sizeof(Time));
 		db0.location.Seek(0);
 		int j = 0;
-		double prev_lon, prev_lat;
+		double prev_lon = DBL_MAX, prev_lat = DBL_MAX;
 		while (!db0.location.IsEof()) {
 			double lon, lat, elev;
 			Time t;
@@ -590,10 +608,69 @@ void Server::ExportCSV() {
 			db0.location.Get(&elev, sizeof(double));
 			db0.location.Get(&t, sizeof(Time));
 			
-			fout << lon << ", " << lat << ", " << elev << ", \"" << Format("%", t) << "\"\n";
+			double dist = CoordinateDistanceKM(Pointf(lon, lat), Pointf(prev_lon, prev_lat));
+			if (dist > 0.01) {
+				fout << lon << ", " << lat << ", " << elev << ", \"" << Format("%", t) << "\"\n";
+				
+				prev_lon = lon;
+				prev_lat = lat;
+			}
 		}
 		
 		db0.lock.Leave();
+	}
+	
+	fout.Close();
+}
+
+String GPXTime(Time t) {
+	return Format("%d-%02d-%02dT%02d:%02d:%02dZ", t.year, t.month, t.day, t.hour, t.minute, t.second);
+}
+
+void Server::ExportGPX() {
+	int ch_id = 0;
+	
+	FileOut fout(ConfigFile("gps.gpx"));
+	fout << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\" ?>\n"
+		<< "<gpx xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\" xmlns:gpxtpx=\"http://www.garmin.com/xmlschemas/TrackPointExtension/v1\" creator=\"Oregon 400t\" version=\"1.1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www.garmin.com/xmlschemas/GpxExtensionsv3.xsd http://www.garmin.com/xmlschemas/TrackPointExtension/v1 http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd\">\n"
+		<< "  <metadata>\n"
+		<< "    <time>"  << GPXTime(GetSysTime()) << "</time>\n"
+		<< "  </metadata>\n";
+	
+	int user_count = db.GetUserCount();
+	for(int i = 0; i < user_count; i++) {
+		UserDatabase& db0 = GetDatabase(i);
+		if (db0.channels.Find(ch_id) == -1) continue;
+		
+		fout << "<trk> <name>" << db0.name << "</name> <trkseg>\n";
+		
+		db0.lock.Enter();
+		
+		int loc_count = db0.location.GetSize() / (3*sizeof(double) + sizeof(Time));
+		db0.location.Seek(0);
+		int j = 0;
+		double prev_lon = DBL_MAX, prev_lat = DBL_MAX;
+		while (!db0.location.IsEof()) {
+			double lon, lat, elev;
+			Time t;
+			db0.location.Get(&lon, sizeof(double));
+			db0.location.Get(&lat, sizeof(double));
+			db0.location.Get(&elev, sizeof(double));
+			db0.location.Get(&t, sizeof(Time));
+			
+			double dist = CoordinateDistanceKM(Pointf(lon, lat), Pointf(prev_lon, prev_lat));
+			if (dist > 0.01) {
+				//fout << lon << ", " << lat << ", " << elev << ", \"" << Format("%", t) << "\"\n";
+				fout << "<trkpt lat=\"" << lat << "\" lon=\"" << lon << "\"><ele>" << elev << "</ele><time>" << GPXTime(t) << "</time></trkpt>\n";
+				
+				prev_lon = lon;
+				prev_lat = lat;
+			}
+		}
+		
+		db0.lock.Leave();
+		
+		fout << "</trkseg></trk>\n";
 	}
 	
 	fout.Close();

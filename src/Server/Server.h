@@ -25,6 +25,7 @@ extern IniInt master_port;
 String RandomPassword(int length);
 void DrawRect(ImageBuffer& ib, Rect r, RGBA rgba);
 int ImageHash(const String& s);
+double CoordinateDistanceKM(Pointf a, Pointf b);
 
 enum {
 	NICK,
@@ -261,6 +262,7 @@ public:
 	void Analyze(String ch);
 	void ChangeLocation();
 	void ExportCSV();
+	void ExportGPX();
 	
 	void Print(const String& s);
 	void Data();
