@@ -673,6 +673,8 @@ void Server::ExportGPX() {
 		fout << "</trkseg></trk>\n";
 	}
 	
+	fout << "</gpx>\n";
+	
 	fout.Close();
 }
 
