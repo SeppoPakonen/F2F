@@ -52,7 +52,7 @@ int ImageHash(const String& str)
 
 	const char *e = s + count;
 	while(s < e)
-		hash = ((hash << 5) - hash) ^ *s++;
+		hash = ((hash << 5) - hash) ^ (int)*s++;
 
 	return hash;
 }
