@@ -93,63 +93,62 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
 
+            // Navigation bar
+            mDrawerLayout = findViewById(R.id.drawer_layout);
+            NavigationView navigationView = findViewById(R.id.nav_view);
+            navigationView.setNavigationItemSelectedListener(
+                    new NavigationView.OnNavigationItemSelectedListener() {
+                        @Override
+                        public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+                            // set item as selected to persist highlight
+                            //menuItem.setChecked(true);
+
+                            // close drawer when item is tapped
+                            mDrawerLayout.closeDrawers();
+
+                            int id = menuItem.getItemId();
+                            if (id == R.id.nav_settings) {
+                                startSettings();
+                            } else if (id == R.id.nav_messages) {
+                                startMessages();
+                            } else if (id == R.id.channel_users) {
+                                startUsers();
+                            }
+                            // Add code here to update the UI based on the item selected
+                            // For example, swap UI fragments here
+                            return true;
+                        }
+                    });
+
+
+            // Set the toolbar as the action bar
+            Toolbar toolbar = findViewById(R.id.toolbar);
+            setSupportActionBar(toolbar);
+            toolbar.setTitle("@string/activity_maps");
+            ActionBar actionbar = getSupportActionBar();
+            actionbar.setDisplayHomeAsUpEnabled(true);
+            actionbar.setHomeAsUpIndicator(R.drawable.ic_menu);
+
+
+            // Obtain the SupportMapFragment and get notified when the map is ready to be used.
+            SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                    .findFragmentById(R.id.map);
+            mapFragment.getMapAsync(this);
+
+
+            // Ask location permissions
+            if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
+            } else {
+                startLocationService();
+            }
+
 
             // Start background service
             if (AppService.last == null) {
                 Intent i = new Intent(this, AppService.class);
                 i.putExtra("name", "F2F service");
                 startService(i);
-
-
-                // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-                SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                        .findFragmentById(R.id.map);
-                mapFragment.getMapAsync(this);
-
-
-                // Navigation bar
-                mDrawerLayout = findViewById(R.id.drawer_layout);
-                NavigationView navigationView = findViewById(R.id.nav_view);
-                navigationView.setNavigationItemSelectedListener(
-                        new NavigationView.OnNavigationItemSelectedListener() {
-                            @Override
-                            public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
-                                // set item as selected to persist highlight
-                                //menuItem.setChecked(true);
-
-                                // close drawer when item is tapped
-                                mDrawerLayout.closeDrawers();
-
-                                int id = menuItem.getItemId();
-                                if (id == R.id.nav_settings) {
-                                    startSettings();
-                                } else if (id == R.id.nav_messages) {
-                                    startMessages();
-                                } else if (id == R.id.channel_users) {
-                                    startUsers();
-                                }
-                                // Add code here to update the UI based on the item selected
-                                // For example, swap UI fragments here
-                                return true;
-                            }
-                        });
-
-
-                // Set the toolbar as the action bar
-                Toolbar toolbar = findViewById(R.id.toolbar);
-                setSupportActionBar(toolbar);
-                toolbar.setTitle("@string/activity_maps");
-                ActionBar actionbar = getSupportActionBar();
-                actionbar.setDisplayHomeAsUpEnabled(true);
-                actionbar.setHomeAsUpIndicator(R.drawable.ic_menu);
-
-
-                // Ask location permissions
-                if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
-                } else {
-                    startLocationService();
-                }
             }
             else {
                 postRefreshGui();
@@ -230,6 +229,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(oulu_uni, 16.0f));
         mMap.setIndoorEnabled(true);
 
+        postRefreshGui();
     }
 
 
@@ -352,6 +352,8 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 
     void refreshGui() {
+        if (AppService.last == null) return;
+
         HashMap<String, Channel> channels = AppService.last.channels;
         HashSet<String> my_channels = AppService.last.my_channels;
         final String active_channel = AppService.last.active_channel;
@@ -359,7 +361,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         AppService.last.lock.lock();
 
-        final RadioGroup channel_list = findViewById(R.id.channel_list);
+        // Bug: https://stackoverflow.com/questions/33194594/navigationview-get-find-header-layout
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        View headerLayout = navigationView.getHeaderView(0);
+        final RadioGroup channel_list = headerLayout.findViewById(R.id.channel_list);
+        if (channel_list == null) return;
+
         channel_list.removeAllViews();
         int i = 0;
         for (String ch : my_channels) {
@@ -383,7 +390,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
 
-        Button join_button = findViewById(R.id.join);
+        Button join_button = headerLayout.findViewById(R.id.join);
         join_button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 joinPrompt();
@@ -391,7 +398,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
 
-        Button leave_button = findViewById(R.id.leave);
+        Button leave_button = headerLayout.findViewById(R.id.leave);
         leave_button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 RadioButton checkedRadioButton = (RadioButton) channel_list.findViewById(channel_list.getCheckedRadioButtonId());
@@ -427,11 +434,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             LatLng loc = new LatLng(u.l.getLatitude(), u.l.getLongitude());
             if (!markers.containsKey(user_id)) {
-                Marker m = mMap.addMarker(new MarkerOptions()
-                        .title(u.name)
-                        .position(loc)
-                        .icon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(u.profile_image, 128, 128, true)))));
-                markers.put(user_id, m);
+                if (mMap != null) {
+                    Marker m = mMap.addMarker(new MarkerOptions()
+                            .title(u.name)
+                            .position(loc)
+                            .icon(BitmapDescriptorFactory.fromBitmap(getCroppedBitmap(Bitmap.createScaledBitmap(u.profile_image, 128, 128, true)))));
+                    markers.put(user_id, m);
+                }
             } else {
                 Marker m = markers.get(user_id);
                 if (m != null)

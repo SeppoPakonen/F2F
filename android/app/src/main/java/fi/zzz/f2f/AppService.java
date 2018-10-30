@@ -653,12 +653,12 @@ public class AppService extends Service {
                 if (hash != new_hash) {
                     try {
                         set("profile_image", imgstr);
-                        prev_set_image = i;
                     }
                     catch (Exc e) {
                         Log.e(TAG, "Changing profile image failed");
                     }
                 }
+                prev_set_image = i;
                 break;
             }
         }
